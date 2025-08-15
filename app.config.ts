@@ -5,23 +5,48 @@ export default (): ExpoConfig => {
   const isWeb = process.env.EXPO_OS === "web";
 
   return {
-    name: "baby-sound-monitor",
+    name: "Baby Sound Monitor",
     slug: "baby-sound-monitor",
-    scheme: "bsm",
-    experiments: { typedRoutes: true },
-    plugins: [
-      ...(!isWeb ? [["expo-notifications"]] : []),
-      ...(useDevClient && !isWeb ? ["expo-dev-client"] : []),
-    ],
+    scheme: "baby-sound-monitor",
+    version: "1.0.0",
+    orientation: "portrait",
+    icon: "./assets/images/icon.png",
+    userInterfaceStyle: "automatic",
+    splash: {
+      backgroundColor: "#ffffff",
+    },
+    assetBundlePatterns: ["**/*"],
     ios: {
       supportsTablet: true,
+      bundleIdentifier: "com.babysoundmonitor.app",
       infoPlist: {
-        NSMicrophoneUsageDescription: "This app uses the microphone to monitor sound.",
-        UIBackgroundModes: ["audio"],
+        NSMicrophoneUsageDescription: "This app uses the microphone to monitor baby sounds in the nursery.",
+        NSCameraUsageDescription: "This app uses the camera to scan QR codes and stream video from the nursery.",
+        UIBackgroundModes: ["audio", "background-processing"],
+        NSUserNotificationsUsageDescription: "This app needs to send notifications when baby sounds are detected.",
       },
     },
     android: {
-      permissions: ["RECORD_AUDIO", "WAKE_LOCK"],
+      package: "com.babysoundmonitor.app",
+      permissions: [
+        "RECORD_AUDIO",
+        "WAKE_LOCK",
+        "CAMERA",
+        "POST_NOTIFICATIONS",
+        "ACCESS_NETWORK_STATE",
+        "INTERNET"
+      ],
     },
+    web: {
+      bundler: "metro",
+      output: "static",
+      favicon: "./assets/images/favicon.png",
+    },
+    plugins: [
+      ...(!isWeb ? [["expo-notifications"]] : []),
+      ...(useDevClient && !isWeb ? ["expo-dev-client"] : []),
+      "expo-camera",
+      "expo-av",
+    ] as any[], // Fix for linter error
   };
 };

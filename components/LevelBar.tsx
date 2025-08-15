@@ -50,7 +50,6 @@ const styles = StyleSheet.create({
   levelBar: {
     height: '100%',
     borderRadius: 10,
-    transition: 'width 0.1s ease',
   },
   thresholdLine: {
     position: 'absolute',

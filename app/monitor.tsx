@@ -9,24 +9,22 @@ import { LevelBar } from '@/components/LevelBar';
 import { ThresholdSlider } from '@/components/ThresholdSlider';
 
 export default function MonitorScreen() {
-  const { threshold, setThreshold, listenerToken, setListenerToken } = useSession();
+  const { threshold, setThreshold } = useSession();
   const [isMonitoring, setIsMonitoring] = useState(false);
   const [audioLevel, setAudioLevel] = useState(0);
+  const [noiseDetected, setNoiseDetected] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [audioMonitor] = useState(() => new AudioMonitor());
 
   useEffect(() => {
     const unsubscribe = audioMonitor.onThresholdExceeded(async () => {
-      if (listenerToken) {
-        try {
-          await notifyListener(listenerToken, 'Baby sound detected!');
-        } catch (error) {
-          console.error('Failed to send notification:', error);
-        }
-      }
+      setNoiseDetected(true);
+      // In a real app, you'd send a notification here
+      console.log('Noise threshold exceeded!');
     });
 
     return unsubscribe;
-  }, [listenerToken]);
+  }, []);
 
   useEffect(() => {
     const unsubscribe = audioMonitor.onLevelUpdate(setAudioLevel);
@@ -47,11 +45,9 @@ export default function MonitorScreen() {
     }
   };
 
-  const handleThresholdChange = (value: number) => {
-    setThreshold(value);
-    if (isMonitoring) {
-      audioMonitor.updateThreshold(value);
-    }
+  const handleThresholdChange = (newThreshold: number) => {
+    setThreshold(newThreshold);
+    console.log('Threshold updated to:', newThreshold);
   };
 
   return (
@@ -85,18 +81,6 @@ export default function MonitorScreen() {
           />
         </View>
 
-        <View style={styles.tokenContainer}>
-          <Text style={styles.sectionTitle}>Listener Token</Text>
-          <TextInput
-            style={styles.tokenInput}
-            value={listenerToken}
-            onChangeText={setListenerToken}
-            placeholder="Paste listener's Expo push token here"
-            multiline
-            numberOfLines={3}
-          />
-        </View>
-
         <TouchableOpacity 
           style={[
             styles.startButton, 
@@ -111,7 +95,7 @@ export default function MonitorScreen() {
 
         {isMonitoring && (
           <Text style={styles.statusText}>
-            Monitoring active - {listenerToken ? 'Connected to listener' : 'No listener connected'}
+            Monitoring active
           </Text>
         )}
       </View>

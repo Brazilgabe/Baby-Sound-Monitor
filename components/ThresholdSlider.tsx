@@ -18,7 +18,7 @@ export function ThresholdSlider({ value, onValueChange }: ThresholdSliderProps) 
         onValueChange={onValueChange}
         minimumTrackTintColor="#3b82f6"
         maximumTrackTintColor="#e5e7eb"
-        thumbStyle={styles.thumb}
+        thumbTintColor="#3b82f6"
       />
       <View style={styles.labels}>
         <Text style={styles.labelText}>10%</Text>
@@ -36,11 +36,6 @@ const styles = StyleSheet.create({
   slider: {
     width: '100%',
     height: 40,
-  },
-  thumb: {
-    backgroundColor: '#3b82f6',
-    width: 20,
-    height: 20,
   },
   labels: {
     flexDirection: 'row',

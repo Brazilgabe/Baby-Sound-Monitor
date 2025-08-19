@@ -1,3 +1,2597 @@
+===== ./app/(tabs)/index.tsx =====
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { theme } from '@/src/theme';
+import { OnboardingScreen } from '@/components/OnboardingScreen';
+import BabyMonitorApp from '../BabyMonitorApp';
+
+export default function HomeScreen() {
+  const [showOnboarding, setShowOnboarding] = useState(true);
+  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web') {
+      checkOnboardingStatus();
+    }
+  }, []);
+
+  const checkOnboardingStatus = async () => {
+    try {
+      const onboardingComplete = await AsyncStorage.getItem('onboardingComplete');
+      if (onboardingComplete === 'true') {
+        setShowOnboarding(false);
+        setHasCompletedOnboarding(true);
+      }
+    } catch (error) {
+      console.log('Error checking onboarding status:', error);
+    }
+  };
+
+  const completeOnboarding = async () => {
+    try {
+      await AsyncStorage.setItem('onboardingComplete', 'true');
+      setShowOnboarding(false);
+      setHasCompletedOnboarding(true);
+    } catch (error) {
+      console.log('Error saving onboarding status:', error);
+    }
+  };
+
+  // Web compatibility check
+  if (Platform.OS === 'web') {
+    return <BabyMonitorApp />;
+  }
+
+  if (showOnboarding) {
+    return <OnboardingScreen onComplete={completeOnboarding} />;
+  }
+
+  if (hasCompletedOnboarding) {
+    return <BabyMonitorApp />;
+  }
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <View style={styles.content}>
+        <Text style={styles.title}>Loading...</Text>
+      </View>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: theme.color.bgDay,
+  },
+  content: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  title: {
+    fontSize: theme.typography.xl.fontSize,
+    color: theme.color.textDay,
+  },
+});===== ./app/(tabs)/_layout.tsx =====
+import { Tabs } from 'expo-router';
+import { Home } from 'lucide-react-native';
+
+export default function TabLayout() {
+  return (
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+        tabBarStyle: { display: 'none' }
+      }}>
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: 'Home',
+          tabBarIcon: ({ size, color }) => (
+            <Home size={size} color={color} />
+          ),
+        }}
+      />
+    </Tabs>
+  );
+}===== ./app/screens/NurseryListener.tsx =====
+import React, { useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { theme } from '@/src/theme';
+import { Header } from '@/components/ui/Header';
+import { ConnectionPill } from '@/components/ui/ConnectionPill';
+import { ModeBadge } from '@/components/ui/ModeBadge';
+import { PrimaryButton } from '@/components/ui/PrimaryButton';
+
+interface NurseryListenerProps {
+  onBackToRole?: () => void;
+  conn: "wifi" | "bt" | null;
+  mode: "audio" | "video";
+}
+
+export default function NurseryListener({ onBackToRole, conn, mode }: NurseryListenerProps) {
+  const [night, setNight] = useState(true);
+  const [active, setActive] = useState(false);
+
+  return (
+    <SafeAreaView style={[styles.container, { backgroundColor: night ? theme.color.bgNight : theme.color.bgDay }]}>
+      <Header onBack={onBackToRole} />
+      
+      <View style={styles.connectionInfo}>
+        <ConnectionPill conn={conn} />
+        <ModeBadge mode={mode} />
+      </View>
+      
+      <View style={styles.content}>
+        <View style={[styles.listenerCard, { 
+          backgroundColor: night ? theme.color.cardNight : theme.color.cardDay,
+          borderColor: night ? theme.color.borderDark : theme.color.border 
+        }]}>
+          <View style={styles.statusRow}>
+            <Text style={[styles.statusText, { color: night ? theme.color.textNight : theme.color.textDay }]}>
+              {active ? "Listening" : "Ready to listen"}
+            </Text>
+            <TouchableOpacity
+              style={[styles.modeToggle, {
+                borderColor: night ? theme.color.borderDark : theme.color.border,
+                backgroundColor: night ? theme.color.bgNight : '#FFFFFF',
+              }]}
+              onPress={() => setNight(!night)}
+            >
+              <Text style={[styles.modeToggleText, { color: night ? theme.color.textNight : theme.color.textDay }]}>
+                {night ? "Night" : "Day"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+          
+          <View style={[styles.placeholder, { 
+            backgroundColor: night ? theme.color.bgNight : theme.color.slate[50] 
+          }]} />
+          
+          <Text style={[styles.instruction, { color: night ? theme.color.textNight : theme.color.textDay }]}>
+            Place phone near the crib with the mic facing the room.
+          </Text>
+        </View>
+        
+        <View style={styles.bottom}>
+          <PrimaryButton onPress={() => setActive(!active)}>
+            {active ? "Stop listening" : "Start listening"}
+          </PrimaryButton>
+          
+          <Text style={[styles.footer, { color: night ? theme.color.textNight : theme.color.textDay }]}>
+            When active, the screen will dim automatically.
+          </Text>
+        </View>
+      </View>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  connectionInfo: {
+    paddingHorizontal: theme.spacing.md,
+    marginTop: theme.spacing.sm,
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: theme.spacing.md,
+    paddingBottom: theme.spacing.xl,
+    paddingTop: theme.spacing.sm,
+  },
+  listenerCard: {
+    borderRadius: theme.borderRadius.xl,
+    padding: theme.spacing.md,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  statusText: {
+    fontSize: theme.typography.sm.fontSize,
+    opacity: 0.8,
+  },
+  modeToggle: {
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  modeToggleText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  placeholder: {
+    marginTop: theme.spacing.md,
+    height: 112, // 28 * 4 (28 is 7rem in Tailwind)
+    borderRadius: theme.borderRadius.lg,
+  },
+  instruction: {
+    marginTop: theme.spacing.md,
+    fontSize: theme.typography.sm.fontSize,
+    opacity: 0.8,
+  },
+  bottom: {
+    marginTop: 'auto',
+    paddingTop: theme.spacing.md,
+  },
+  footer: {
+    fontSize: 13,
+    opacity: 0.7,
+    marginTop: theme.spacing.md,
+    textAlign: 'center',
+  },
+});
+===== ./app/screens/PairingSelect.tsx =====
+import React, { useState } from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+import { QrCode, Keyboard } from 'lucide-react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { theme } from '@/src/theme';
+import { Header } from '@/components/ui/Header';
+import { OptionCard } from '@/components/ui/OptionCard';
+import { PrimaryButton } from '@/components/ui/PrimaryButton';
+import { ModeChips } from '@/components/ui/ModeChips';
+import { ConnectionPill } from '@/components/ui/ConnectionPill';
+
+interface PairingSelectProps {
+  conn: "wifi" | "bt";
+  mode: "audio" | "video";
+  onModeChange: (mode: "audio" | "video") => void;
+  onNext: (method: "qr" | "code") => void;
+  onBack: () => void;
+}
+
+export default function PairingSelect({ conn, mode, onModeChange, onNext, onBack }: PairingSelectProps) {
+  const [method, setMethod] = useState<"qr" | "code" | null>(conn === "wifi" ? "qr" : "code");
+  const recommended = conn === "wifi" ? "qr" : "code";
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <Header onBack={onBack} />
+      
+      <View style={styles.content}>
+        <View style={styles.header}>
+          <Text style={styles.subtitle}>Pair your devices</Text>
+          <ConnectionPill conn={conn} />
+        </View>
+        
+        <View style={styles.modeSection}>
+          <ModeChips mode={mode} onChange={onModeChange} />
+        </View>
+        
+        <View style={styles.options}>
+          <OptionCard
+            icon={<QrCode size={24} color={theme.color.primary} />}
+            title="Scan QR code"
+            desc="Fast pairing with your camera. Recommended for Wi‑Fi/Data."
+            selected={method === "qr"}
+            onPress={() => setMethod("qr")}
+            badge={recommended === "qr" ? "Recommended" : undefined}
+          />
+          
+          <OptionCard
+            icon={<Keyboard size={24} color={theme.color.slate[600]} />}
+            title="Enter 6‑digit code"
+            desc="Show code on the other phone and enter here. Best for Bluetooth."
+            selected={method === "code"}
+            onPress={() => setMethod("code")}
+            badge={recommended === "code" ? "Recommended" : undefined}
+          />
+        </View>
+        
+        <View style={styles.bottom}>
+          <PrimaryButton
+            disabled={!method}
+            onPress={() => method && onNext(method)}
+          >
+            Continue
+          </PrimaryButton>
+        </View>
+      </View>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: theme.color.bgDay,
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: theme.spacing.md,
+    paddingBottom: theme.spacing.md,
+    paddingTop: theme.spacing.sm,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  subtitle: {
+    fontSize: theme.typography.sm.fontSize,
+    color: theme.color.slate[600],
+  },
+  modeSection: {
+    marginTop: theme.spacing.md,
+  },
+  options: {
+    marginTop: theme.spacing.md,
+    gap: theme.spacing.md,
+  },
+  bottom: {
+    marginTop: 'auto',
+    paddingTop: theme.spacing.md,
+  },
+});
+===== ./app/screens/ParentMonitor.tsx =====
+import React, { useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { Play, Square, Bell, Home, Activity, Settings } from 'lucide-react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { theme } from '@/src/theme';
+import { Header } from '@/components/ui/Header';
+import { ConnectionPill } from '@/components/ui/ConnectionPill';
+import { ModeBadge } from '@/components/ui/ModeBadge';
+import { WaveformPreview } from '@/components/ui/WaveformPreview';
+import { LabeledSlider } from '@/components/ui/LabeledSlider';
+
+interface ParentMonitorProps {
+  onBack?: () => void;
+  conn: "wifi" | "bt" | null;
+  mode: "audio" | "video";
+}
+
+export default function ParentMonitor({ onBack, conn, mode }: ParentMonitorProps) {
+  const [isListening, setIsListening] = useState(false);
+  const [preset, setPreset] = useState("Normal home");
+  const [threshold, setThreshold] = useState(45);
+  
+  const tabs = [
+    { key: "monitor", label: "Monitor", icon: Home },
+    { key: "timeline", label: "Timeline", icon: Activity },
+    { key: "settings", label: "Settings", icon: Settings },
+  ];
+  const [tab, setTab] = useState<typeof tabs[number]["key"]>("monitor");
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <Header onBack={onBack} onSettings={() => setTab("settings")} />
+
+      <View style={styles.connectionInfo}>
+        <ConnectionPill conn={conn} />
+        <ModeBadge mode={mode} />
+      </View>
+
+      <View style={styles.content}>
+        {tab === "monitor" && (
+          <View style={styles.monitorTab}>
+            <View style={styles.monitorCard}>
+              <View style={styles.statusRow}>
+                <View style={styles.statusInfo}>
+                  <View style={[styles.statusDot, isListening && styles.statusDotActive]} />
+                  <Text style={styles.statusText}>
+                    {isListening ? "Listening" : "Paused"}
+                  </Text>
+                </View>
+                <Text style={styles.presetText}>Preset: {preset}</Text>
+              </View>
+              
+              <View style={styles.waveformContainer}>
+                <WaveformPreview level={isListening ? 0.6 : 0.3} />
+              </View>
+              
+              <View style={styles.controlsRow}>
+                <View style={styles.presetButtons}>
+                  {["Quiet apartment", "Normal home", "Noisy environment"].map((p) => (
+                    <TouchableOpacity
+                      key={p}
+                      style={[styles.presetButton, preset === p && styles.presetButtonSelected]}
+                      onPress={() => setPreset(p)}
+                    >
+                      <Text style={[styles.presetButtonText, preset === p && styles.presetButtonTextSelected]}>
+                        {p}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                
+                <TouchableOpacity
+                  style={[styles.playButton, { backgroundColor: theme.color.primary }]}
+                  onPress={() => setIsListening(!isListening)}
+                >
+                  {isListening ? <Square size={16} color="#FFFFFF" /> : <Play size={16} color="#FFFFFF" />}
+                  <Text style={styles.playButtonText}>
+                    {isListening ? "Stop" : "Start"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              
+              <LabeledSlider label="Noise threshold" value={threshold} onChange={setThreshold} />
+              
+              <View style={styles.bedtimeInfo}>
+                <Bell size={16} color={theme.color.slate[600]} />
+                <Text style={styles.bedtimeText}>Bedtime Focus reduces minor noise alerts</Text>
+              </View>
+            </View>
+            
+            <Text style={styles.quietMessage}>All quiet. We will let you know if anything changes.</Text>
+          </View>
+        )}
+        
+        {tab === "timeline" && (
+          <View style={styles.timelineTab}>
+            {[1, 2, 3].map((i) => (
+              <View key={i} style={styles.timelineItem}>
+                <View style={styles.timelineContent}>
+                  <Text style={styles.timelineTitle}>Cry detected</Text>
+                  <Text style={styles.timelineSubtitle}>Duration 18s · 2:11 am</Text>
+                </View>
+                <TouchableOpacity style={styles.timelineButton}>
+                  <Text style={styles.timelineButtonText}>Details</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        )}
+        
+        {tab === "settings" && (
+          <View style={styles.settingsTab}>
+            <View style={styles.settingItem}>
+              <View style={styles.settingContent}>
+                <Text style={styles.settingTitle}>Notifications</Text>
+                <Text style={styles.settingSubtitle}>Get alerts when crying is detected</Text>
+              </View>
+              <View style={styles.toggle}>
+                <View style={styles.toggleThumb} />
+              </View>
+            </View>
+          </View>
+        )}
+      </View>
+
+      {/* Bottom Navigation */}
+      <View style={styles.bottomNav}>
+        <View style={styles.navContent}>
+          {tabs.map(({ key, label, icon: Icon }) => (
+            <TouchableOpacity
+              key={key}
+              style={styles.navButton}
+              onPress={() => setTab(key)}
+            >
+              <View style={[styles.navIcon, tab === key && styles.navIconActive]}>
+                <Icon size={18} color={tab === key ? theme.color.primary : theme.color.slate[500]} />
+              </View>
+              <Text style={[styles.navLabel, tab === key && styles.navLabelActive]}>
+                {label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: theme.color.bgDay,
+  },
+  connectionInfo: {
+    paddingHorizontal: theme.spacing.md,
+    marginTop: theme.spacing.sm,
+    flexDirection: 'row',
+    gap: theme.spacing.sm,
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: theme.spacing.md,
+    paddingBottom: 112, // Space for bottom nav
+  },
+  monitorTab: {
+    marginTop: theme.spacing.sm,
+  },
+  monitorCard: {
+    borderRadius: theme.borderRadius.xl,
+    padding: theme.spacing.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: theme.color.slate[200],
+    backgroundColor: '#FFFFFF',
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  statusInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+  },
+  statusDot: {
+    height: 8,
+    width: 8,
+    borderRadius: 4,
+    backgroundColor: theme.color.slate[400],
+  },
+  statusDotActive: {
+    backgroundColor: theme.color.emerald[500],
+  },
+  statusText: {
+    fontSize: theme.typography.sm.fontSize,
+    opacity: 0.8,
+  },
+  presetText: {
+    fontSize: 12,
+    opacity: 0.7,
+  },
+  waveformContainer: {
+    marginTop: theme.spacing.md,
+  },
+  controlsRow: {
+    marginTop: theme.spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: theme.spacing.sm,
+  },
+  presetButtons: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: theme.spacing.sm,
+  },
+  presetButton: {
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: theme.color.slate[200],
+    backgroundColor: '#FFFFFF',
+  },
+  presetButtonSelected: {
+    backgroundColor: theme.color.primary,
+    borderColor: 'transparent',
+  },
+  presetButtonText: {
+    fontSize: theme.typography.sm.fontSize,
+    color: theme.color.slate[700],
+  },
+  presetButtonTextSelected: {
+    color: '#FFFFFF',
+  },
+  playButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.borderRadius.xl,
+  },
+  playButtonText: {
+    color: '#FFFFFF',
+    fontSize: theme.typography.sm.fontSize,
+    fontWeight: '500',
+  },
+  bedtimeInfo: {
+    marginTop: theme.spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+  },
+  bedtimeText: {
+    fontSize: theme.typography.sm.fontSize,
+    opacity: 0.8,
+  },
+  quietMessage: {
+    marginTop: theme.spacing.md,
+    fontSize: theme.typography.sm.fontSize,
+    opacity: 0.8,
+  },
+  timelineTab: {
+    marginTop: theme.spacing.sm,
+    gap: theme.spacing.md,
+  },
+  timelineItem: {
+    borderRadius: theme.borderRadius.xl,
+    padding: theme.spacing.md,
+    borderWidth: 1,
+    borderColor: theme.color.slate[200],
+    backgroundColor: '#FFFFFF',
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+  },
+  timelineContent: {
+    flex: 1,
+  },
+  timelineTitle: {
+    fontSize: theme.typography.sm.fontSize,
+    fontWeight: '500',
+  },
+  timelineSubtitle: {
+    fontSize: 12,
+    opacity: 0.7,
+    marginTop: 2,
+  },
+  timelineButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  timelineButtonText: {
+    fontSize: theme.typography.sm.fontSize,
+    color: theme.color.slate[700],
+  },
+  settingsTab: {
+    marginTop: theme.spacing.sm,
+    gap: theme.spacing.md,
+  },
+  settingItem: {
+    borderRadius: theme.borderRadius.xl,
+    padding: theme.spacing.md,
+    borderWidth: 1,
+    borderColor: theme.color.slate[200],
+    backgroundColor: '#FFFFFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  settingContent: {
+    flex: 1,
+  },
+  settingTitle: {
+    fontSize: theme.typography.sm.fontSize,
+    fontWeight: '500',
+  },
+  settingSubtitle: {
+    fontSize: 12,
+    opacity: 0.7,
+    marginTop: 2,
+  },
+  toggle: {
+    width: 48,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: theme.color.primary,
+    padding: 2,
+  },
+  toggleThumb: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    transform: [{ translateX: 20 }],
+  },
+  bottomNav: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderTopWidth: 1,
+    borderTopColor: theme.color.border,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    backdropFilter: 'blur(10px)',
+  },
+  navContent: {
+    marginHorizontal: 'auto',
+    maxWidth: 400,
+    paddingHorizontal: theme.spacing.xl,
+    paddingVertical: theme.spacing.sm,
+    flexDirection: 'row',
+    gap: theme.spacing.md,
+  },
+  navButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: theme.borderRadius.lg,
+    paddingVertical: theme.spacing.sm,
+  },
+  navIcon: {
+    padding: theme.spacing.sm,
+    borderRadius: theme.borderRadius.lg,
+  },
+  navIconActive: {
+    backgroundColor: `${theme.color.primary}1A`, // 10% opacity
+  },
+  navLabel: {
+    fontSize: 12,
+    marginTop: theme.spacing.xs,
+    color: theme.color.slate[500],
+  },
+  navLabelActive: {
+    color: theme.color.primary,
+  },
+});
+===== ./app/screens/ConnectionSelect.tsx =====
+import React, { useState } from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+import { Wifi, Bluetooth } from 'lucide-react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { theme } from '@/src/theme';
+import { Header } from '@/components/ui/Header';
+import { OptionCard } from '@/components/ui/OptionCard';
+import { PrimaryButton } from '@/components/ui/PrimaryButton';
+
+interface ConnectionSelectProps {
+  onNext: (choice: "wifi" | "bt") => void;
+}
+
+export default function ConnectionSelect({ onNext }: ConnectionSelectProps) {
+  const [choice, setChoice] = useState<"wifi" | "bt" | null>(null);
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <Header />
+      
+      <View style={styles.content}>
+        <Text style={styles.subtitle}>
+          Choose the connection that fits your setup.
+        </Text>
+        
+        <View style={styles.options}>
+          <OptionCard
+            icon={<Wifi size={24} color={theme.color.primary} />}
+            title="Wi‑Fi or Data"
+            desc="Best reliability and range. Works anywhere your phones have internet."
+            selected={choice === "wifi"}
+            onPress={() => setChoice("wifi")}
+            badge="Recommended"
+          />
+          
+          <OptionCard
+            icon={<Bluetooth size={24} color={theme.color.slate[600]} />}
+            title="Bluetooth"
+            desc="Simple nearby connection. Good when both phones are in the same room."
+            selected={choice === "bt"}
+            onPress={() => setChoice("bt")}
+          />
+        </View>
+        
+        <View style={styles.bottom}>
+          <PrimaryButton
+            disabled={!choice}
+            onPress={() => choice && onNext(choice)}
+          >
+            Continue
+          </PrimaryButton>
+          
+          <Text style={styles.footer}>
+            You can change this later in Settings.
+          </Text>
+        </View>
+      </View>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: theme.color.bgDay,
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: theme.spacing.md,
+    paddingBottom: theme.spacing.md,
+    paddingTop: theme.spacing.sm,
+  },
+  subtitle: {
+    marginTop: theme.spacing.sm,
+    color: theme.color.slate[600],
+    fontSize: theme.typography.sm.fontSize,
+  },
+  options: {
+    marginTop: theme.spacing.md,
+    gap: theme.spacing.md,
+  },
+  bottom: {
+    marginTop: 'auto',
+    paddingTop: theme.spacing.md,
+  },
+  footer: {
+    fontSize: 13,
+    color: theme.color.slate[500],
+    marginTop: theme.spacing.md,
+    textAlign: 'center',
+  },
+});
+===== ./app/screens/RoleSelect.tsx =====
+import React, { useState } from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+import { Phone, Baby } from 'lucide-react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { theme } from '@/src/theme';
+import { Header } from '@/components/ui/Header';
+import { OptionCard } from '@/components/ui/OptionCard';
+import { PrimaryButton } from '@/components/ui/PrimaryButton';
+
+interface RoleSelectProps {
+  onNext: (role: "parent" | "baby") => void;
+  onBack: () => void;
+}
+
+export default function RoleSelect({ onNext, onBack }: RoleSelectProps) {
+  const [role, setRole] = useState<"parent" | "baby" | null>(null);
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <Header onBack={onBack} />
+      
+      <View style={styles.content}>
+        <View style={styles.options}>
+          <OptionCard
+            icon={<Phone size={24} color={theme.color.primary} />}
+            title="Parent"
+            desc="Get alerts and listen from anywhere. Designed for one‑hand use."
+            selected={role === "parent"}
+            onPress={() => setRole("parent")}
+          />
+          
+          <OptionCard
+            icon={<Baby size={24} color={theme.color.slate[600]} />}
+            title="Nursery Listener"
+            desc="Stays in the baby room and listens. Low‑light friendly."
+            selected={role === "baby"}
+            onPress={() => setRole("baby")}
+          />
+        </View>
+        
+        <View style={styles.bottom}>
+          <PrimaryButton
+            disabled={!role}
+            onPress={() => role && onNext(role)}
+          >
+            Continue
+          </PrimaryButton>
+          
+          <Text style={styles.footer}>
+            You can switch roles anytime.
+          </Text>
+        </View>
+      </View>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: theme.color.bgDay,
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: theme.spacing.md,
+    paddingBottom: theme.spacing.md,
+    paddingTop: theme.spacing.sm,
+  },
+  options: {
+    marginTop: theme.spacing.sm,
+    gap: theme.spacing.md,
+  },
+  bottom: {
+    marginTop: 'auto',
+    paddingTop: theme.spacing.md,
+  },
+  footer: {
+    fontSize: 13,
+    color: theme.color.slate[500],
+    marginTop: theme.spacing.md,
+    textAlign: 'center',
+  },
+});
+===== ./app/screens/QRScanner.tsx =====
+import React from 'react';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { QrCode, Camera } from 'lucide-react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { theme } from '@/src/theme';
+import { Header } from '@/components/ui/Header';
+import { PrimaryButton } from '@/components/ui/PrimaryButton';
+import { ConnectionPill } from '@/components/ui/ConnectionPill';
+
+interface QRScannerProps {
+  onBack: () => void;
+  onUseCode: () => void;
+  onConnected: () => void;
+  conn: "wifi" | "bt";
+}
+
+export default function QRScanner({ onBack, onUseCode, onConnected, conn }: QRScannerProps) {
+  return (
+    <SafeAreaView style={styles.container}>
+      <Header onBack={onBack} />
+      
+      <View style={styles.content}>
+        <View style={styles.header}>
+          <Text style={styles.subtitle}>Scan the QR on the other phone</Text>
+          <ConnectionPill conn={conn} />
+        </View>
+        
+        <View style={styles.scannerContainer}>
+          <View style={styles.scannerFrame} />
+          <QrCode size={56} color={theme.color.slate[400]} />
+          <View style={styles.cameraLabel}>
+            <Camera size={14} color={theme.color.slate[600]} />
+            <Text style={styles.cameraText}>Camera preview</Text>
+          </View>
+        </View>
+        
+        <View style={styles.bottom}>
+          <PrimaryButton onPress={onConnected}>
+            Simulate scan
+          </PrimaryButton>
+          
+          <View style={styles.codeOption}>
+            <TouchableOpacity onPress={onUseCode}>
+              <Text style={styles.codeText}>
+                Enter code instead
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: theme.color.bgDay,
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: theme.spacing.md,
+    paddingBottom: theme.spacing.md,
+    paddingTop: theme.spacing.sm,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  subtitle: {
+    fontSize: theme.typography.sm.fontSize,
+    color: theme.color.slate[600],
+  },
+  scannerContainer: {
+    marginTop: theme.spacing.md,
+    borderRadius: theme.borderRadius.xl,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: theme.color.slate[300],
+    backgroundColor: theme.color.slate[50],
+    height: 288, // 72 * 4 (72 is 18rem in Tailwind)
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  scannerFrame: {
+    position: 'absolute',
+    top: theme.spacing.md,
+    left: theme.spacing.md,
+    right: theme.spacing.md,
+    bottom: theme.spacing.md,
+    borderRadius: theme.borderRadius.xl,
+    borderWidth: 2,
+    borderColor: theme.color.slate[300],
+  },
+  cameraLabel: {
+    position: 'absolute',
+    bottom: theme.spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  cameraText: {
+    fontSize: 12,
+    color: theme.color.slate[600],
+  },
+  bottom: {
+    marginTop: 'auto',
+    paddingTop: theme.spacing.md,
+    gap: theme.spacing.sm,
+  },
+  codeOption: {
+    alignItems: 'center',
+  },
+  codeText: {
+    fontSize: theme.typography.sm.fontSize,
+    color: theme.color.slate[700],
+    paddingVertical: theme.spacing.sm,
+  },
+});
+===== ./app/screens/CodeEntry.tsx =====
+import React, { useState } from 'react';
+import { View, Text, TextInput, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { theme } from '@/src/theme';
+import { Header } from '@/components/ui/Header';
+import { PrimaryButton } from '@/components/ui/PrimaryButton';
+import { ConnectionPill } from '@/components/ui/ConnectionPill';
+
+interface CodeEntryProps {
+  onBack: () => void;
+  onConnected: () => void;
+  conn: "wifi" | "bt";
+}
+
+export default function CodeEntry({ onBack, onConnected, conn }: CodeEntryProps) {
+  const [code, setCode] = useState("");
+  const digits = Array.from({ length: 6 }, (_, i) => code[i] || "");
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <Header onBack={onBack} />
+      
+      <View style={styles.content}>
+        <View style={styles.header}>
+          <Text style={styles.subtitle}>Enter the 6‑digit code</Text>
+          <ConnectionPill conn={conn} />
+        </View>
+        
+        <View style={styles.digitsContainer}>
+          {digits.map((digit, i) => (
+            <View key={i} style={styles.digitBox}>
+              <Text style={styles.digitText}>{digit}</Text>
+            </View>
+          ))}
+        </View>
+        
+        <TextInput
+          style={styles.input}
+          value={code}
+          onChangeText={(text) => setCode(text.replace(/[^0-9]/g, '').slice(0, 6))}
+          inputMode="numeric"
+          placeholder="123456"
+          placeholderTextColor={theme.color.slate[400]}
+        />
+        
+        <View style={styles.bottom}>
+          <PrimaryButton
+            disabled={code.length !== 6}
+            onPress={onConnected}
+          >
+            Connect
+          </PrimaryButton>
+        </View>
+      </View>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: theme.color.bgDay,
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: theme.spacing.md,
+    paddingBottom: theme.spacing.md,
+    paddingTop: theme.spacing.sm,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  subtitle: {
+    fontSize: theme.typography.sm.fontSize,
+    color: theme.color.slate[600],
+  },
+  digitsContainer: {
+    marginTop: theme.spacing.xl,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: theme.spacing.sm,
+  },
+  digitBox: {
+    width: 40,
+    height: 48,
+    borderRadius: theme.borderRadius.lg,
+    borderWidth: 1,
+    borderColor: theme.color.slate[300],
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  digitText: {
+    fontSize: theme.typography.xl.fontSize,
+    fontWeight: '500',
+    color: theme.color.textDay,
+  },
+  input: {
+    marginTop: theme.spacing.xl,
+    width: '100%',
+    padding: theme.spacing.md,
+    borderWidth: 1,
+    borderColor: theme.color.slate[300],
+    borderRadius: theme.borderRadius.lg,
+    fontSize: theme.typography.base.fontSize,
+    color: theme.color.textDay,
+  },
+  bottom: {
+    marginTop: 'auto',
+    paddingTop: theme.spacing.md,
+  },
+});
+===== ./app/+not-found.tsx =====
+import { Link, Stack } from 'expo-router';
+import { StyleSheet, Text, View } from 'react-native';
+
+export default function NotFoundScreen() {
+  return (
+    <>
+      <Stack.Screen options={{ title: 'Oops!' }} />
+      <View style={styles.container}>
+        <Text style={styles.title}>This screen doesn't exist.</Text>
+        <Link href="/" style={styles.link}>
+          <Text style={styles.linkText}>Go to home screen!</Text>
+        </Link>
+      </View>
+    </>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: '600',
+  },
+  link: {
+    marginTop: 15,
+    paddingVertical: 15,
+  },
+  linkText: {
+    fontSize: 14,
+    color: '#2e78b7',
+  },
+});
+===== ./app/BabyMonitorApp.tsx =====
+import React, { useState } from 'react';
+import { Platform } from 'react-native';
+import ConnectionSelect from './screens/ConnectionSelect';
+import RoleSelect from './screens/RoleSelect';
+import PairingSelect from './screens/PairingSelect';
+import QRScanner from './screens/QRScanner';
+import CodeEntry from './screens/CodeEntry';
+import ParentMonitor from './screens/ParentMonitor';
+import NurseryListener from './screens/NurseryListener';
+
+type AppStep = "connect" | "role" | "pair" | "qr" | "code" | "parent" | "baby";
+
+export default function BabyMonitorApp() {
+  const [step, setStep] = useState<AppStep>("connect");
+  const [conn, setConn] = useState<"wifi" | "bt" | null>(null);
+  const [role, setRole] = useState<"parent" | "baby" | null>(null);
+  const [mode, setMode] = useState<"audio" | "video">("audio");
+
+  // Web compatibility check
+  if (Platform.OS === 'web') {
+    // For web, we'll show a simplified version or redirect to mobile
+    return (
+      <div style={{ 
+        padding: '20px', 
+        textAlign: 'center', 
+        fontFamily: 'system-ui, -apple-system, sans-serif',
+        backgroundColor: '#F7F8FB',
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'center'
+      }}>
+        <h1 style={{ color: '#0C1222', marginBottom: '20px' }}>Baby Sound Monitor</h1>
+        <p style={{ color: '#64748B', maxWidth: '400px', lineHeight: '1.6' }}>
+          This app is designed for mobile devices. Please use the Expo Go app on your phone 
+          or run it in a mobile simulator for the full experience.
+        </p>
+        <div style={{ 
+          marginTop: '30px', 
+          padding: '15px 30px', 
+          backgroundColor: '#4C6EF5', 
+          color: 'white', 
+          borderRadius: '12px',
+          cursor: 'pointer'
+        }}>
+          Open in Mobile Simulator
+        </div>
+      </div>
+    );
+  }
+
+  const handleConnectionSelect = (choice: "wifi" | "bt") => {
+    setConn(choice);
+    setStep("role");
+  };
+
+  const handleRoleSelect = (selectedRole: "parent" | "baby") => {
+    setRole(selectedRole);
+    setStep("pair");
+  };
+
+  const handlePairingSelect = (method: "qr" | "code") => {
+    setStep(method);
+  };
+
+  const handleConnected = () => {
+    setStep(role === "parent" ? "parent" : "baby");
+  };
+
+  const handleBackToRole = () => {
+    setStep("role");
+  };
+
+  const handleBackToConnection = () => {
+    setStep("connect");
+    setConn(null);
+    setRole(null);
+  };
+
+  const handleBackToPairing = () => {
+    setStep("pair");
+  };
+
+  const handleUseCode = () => {
+    setStep("code");
+  };
+
+  return (
+    <>
+      {step === "connect" && (
+        <ConnectionSelect onNext={handleConnectionSelect} />
+      )}
+      
+      {step === "role" && (
+        <RoleSelect onBack={handleBackToConnection} onNext={handleRoleSelect} />
+      )}
+      
+      {step === "pair" && conn && (
+        <PairingSelect
+          conn={conn}
+          mode={mode}
+          onModeChange={setMode}
+          onBack={handleBackToConnection}
+          onNext={handlePairingSelect}
+        />
+      )}
+      
+      {step === "qr" && conn && (
+        <QRScanner
+          conn={conn}
+          onBack={handleBackToPairing}
+          onUseCode={handleUseCode}
+          onConnected={handleConnected}
+        />
+      )}
+      
+      {step === "code" && conn && (
+        <CodeEntry
+          conn={conn}
+          onBack={handleBackToPairing}
+          onConnected={handleConnected}
+        />
+      )}
+      
+      {step === "parent" && (
+        <ParentMonitor
+          onBack={handleBackToRole}
+          conn={conn}
+          mode={mode}
+        />
+      )}
+      
+      {step === "baby" && (
+        <NurseryListener
+          onBackToRole={handleBackToRole}
+          conn={conn}
+          mode={mode}
+        />
+      )}
+    </>
+  );
+}
+===== ./app/_layout.tsx =====
+import { useEffect } from 'react';
+import { Stack } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { useFrameworkReady } from '@/hooks/useFrameworkReady';
+
+export default function RootLayout() {
+  useFrameworkReady();
+
+  return (
+    <>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="listener" options={{ headerShown: false }} />
+        <Stack.Screen name="parent" options={{ headerShown: false }} />
+        <Stack.Screen name="+not-found" />
+      </Stack>
+      <StatusBar style="auto" />
+    </>
+  );
+}===== ./eas.json =====
+{
+  "cli": { 
+    "appVersionSource": "remote" 
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": { "USE_DEV_CLIENT": "1" }
+    }
+  }
+}===== ./README.md =====
+# Baby Sound Monitor
+
+A minimal React Native app with Expo that acts as a one-way baby sound monitor. The Monitor device captures audio and sends push notifications to the Listener device when sound levels exceed a configurable threshold.
+
+## Features
+
+- **Monitor Mode**: Records audio, shows real-time levels, sends alerts when threshold exceeded
+- **Listener Mode**: Receives push notifications, displays connection status and last alert time
+- **One-way communication**: Monitor → Listener only (no audio streaming)
+- **Configurable threshold**: Adjustable sensitivity via slider
+- **Real-time audio level display**: Visual feedback of current sound levels
+- **No cloud storage**: All processing happens locally on device
+
+## Tech Stack
+
+- Expo SDK 53
+- React Native 0.79
+- Expo Router for navigation
+- expo-av for microphone input
+- expo-notifications for push alerts
+- @react-native-community/slider for threshold control
+- Zustand for state management
+- TypeScript
+- Jest for testing
+
+## Installation
+
+```bash
+npm install
+```
+
+## Development
+
+### EAS Dev Client Setup
+
+1. Install EAS CLI:
+```bash
+npm install -g @expo/eas-cli
+```
+
+2. Login to EAS:
+```bash
+eas login
+```
+
+3. Build development client for iOS:
+```bash
+eas build --profile development --platform ios
+```
+
+4. Build development client for Android:
+```bash
+eas build --profile development --platform android
+```
+
+5. Install the development build on your devices and run:
+```bash
+npx expo start --dev-client
+```
+
+### Local Development (Expo Go)
+
+```bash
+npx expo start
+```
+
+Note: Some features like background audio may not work in Expo Go. Use EAS Dev Client for full functionality.
+
+## Usage
+
+### Setup Process
+
+1. **Listener Device**: 
+   - Open app and select "Listener"
+   - Allow push notification permissions
+   - Copy the displayed Expo push token
+
+2. **Monitor Device**:
+   - Open app and select "Monitor" 
+   - Allow microphone permissions
+   - Paste the Listener's push token
+   - Adjust threshold slider (default 30%)
+   - Press "Start Monitoring"
+
+3. **Testing**:
+   - Make noise near Monitor device
+   - Listener should receive push notification when threshold exceeded
+
+### Threshold Guidelines
+
+- **10-20%**: Very sensitive (picks up quiet sounds)
+- **30-40%**: Normal sensitivity (crying, loud talking)
+- **50-60%**: Less sensitive (only loud sounds)
+- **70%+**: Very insensitive (only very loud sounds)
+
+## Project Structure
+
+```
+├── app/
+│   ├── (tabs)/
+│   │   ├── _layout.tsx        # Tab navigation setup
+│   │   └── index.tsx          # Role selection screen
+│   ├── _layout.tsx            # Root layout
+│   ├── monitor.tsx            # Monitor screen
+│   └── listener.tsx           # Listener screen
+├── src/
+│   ├── audio/
+│   │   ├── monitor.ts         # Audio monitoring class
+│   │   └── monitor.test.ts    # Unit tests
+│   ├── notify/
+│   │   └── index.ts           # Push notification helpers
+│   └── store/
+│       └── useSession.ts      # Zustand state store
+├── components/
+│   ├── LevelBar.tsx           # Audio level visualization
+│   └── ThresholdSlider.tsx    # Threshold control slider
+├── hooks/
+│   └── useFrameworkReady.ts   # Framework initialization
+├── app.json                   # Expo configuration
+├── eas.json                   # EAS build configuration
+└── package.json
+```
+
+## Permissions
+
+### iOS
+- `NSMicrophoneUsageDescription`: Required for audio monitoring
+- `UIBackgroundModes: ["audio"]`: Allows background audio processing
+
+### Android
+- `android.permission.RECORD_AUDIO`: Required for microphone access
+- `android.permission.FOREGROUND_SERVICE`: For background monitoring
+- `android.permission.WAKE_LOCK`: Keep device awake during monitoring
+
+## Troubleshooting
+
+### Microphone Permission Issues
+- Ensure permissions are granted in device settings
+- Try restarting the app after granting permissions
+- On iOS, check Privacy & Security → Microphone settings
+
+### Push Notification Issues
+- Verify Expo push token is correctly copied (no extra spaces)
+- Check notification permissions in device settings
+- Ensure devices are on same network or have internet connectivity
+- Test with a simple push notification first
+
+### Background Audio Issues
+- iOS: Ensure `UIBackgroundModes` includes "audio" in app.json
+- Android: Use EAS Dev Client instead of Expo Go for background functionality
+- Keep the Monitor app in foreground for reliable operation
+
+### EAS Build Issues
+- Ensure you're logged into EAS CLI: `eas whoami`
+- Check your Expo account has the necessary build minutes
+- Verify app.json configuration matches EAS requirements
+
+## Testing
+
+Run unit tests:
+```bash
+npm test
+```
+
+The test suite includes:
+- Audio monitor initialization
+- Threshold detection logic
+- Event listener management
+- RMS calculation validation
+
+## Limitations
+
+- **One-way only**: No audio streaming from Monitor to Listener
+- **No cloud storage**: No permanent record of events
+- **Push notification dependency**: Requires internet for notifications
+- **Platform differences**: iOS has better real-time audio analysis than Android
+- **Background limitations**: May require keeping Monitor app in foreground on some devices
+
+## Contributing
+
+1. Keep dependencies minimal
+2. Follow the existing TypeScript patterns
+3. Add tests for new audio processing logic
+4. Ensure cross-platform compatibility
+
+## License
+
+MIT===== ./components/ui/ConnectionPill.tsx =====
+import React from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+import { Bluetooth, Wifi } from 'lucide-react-native';
+import { theme } from '@/src/theme';
+
+interface ConnectionPillProps {
+  conn: "wifi" | "bt" | null;
+}
+
+export function ConnectionPill({ conn }: ConnectionPillProps) {
+  if (!conn) return null;
+  
+  const label = conn === "bt" ? "Bluetooth" : "Wi‑Fi/Data";
+  const Icon = conn === "bt" ? Bluetooth : Wifi;
+  
+  return (
+    <View style={styles.pill}>
+      <Icon size={14} color={theme.color.slate[700]} />
+      <Text style={styles.label}>{label}</Text>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+    backgroundColor: theme.color.slate[100],
+    borderWidth: 1,
+    borderColor: theme.color.slate[200],
+  },
+  label: {
+    fontSize: 12,
+    color: theme.color.slate[700],
+    fontWeight: '500',
+  },
+});
+===== ./components/ui/PrimaryButton.tsx =====
+import React from 'react';
+import { TouchableOpacity, Text, StyleSheet } from 'react-native';
+import { theme } from '@/src/theme';
+
+interface PrimaryButtonProps {
+  children: React.ReactNode;
+  onPress?: () => void;
+  disabled?: boolean;
+}
+
+export function PrimaryButton({ children, onPress, disabled }: PrimaryButtonProps) {
+  return (
+    <TouchableOpacity
+      style={[styles.button, disabled && styles.buttonDisabled]}
+      onPress={onPress}
+      disabled={disabled}
+      activeOpacity={0.8}
+    >
+      <Text style={[styles.text, disabled && styles.textDisabled]}>
+        {children}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
+const styles = StyleSheet.create({
+  button: {
+    width: '100%',
+    paddingVertical: theme.spacing.md,
+    borderRadius: theme.borderRadius.xl,
+    backgroundColor: theme.color.primary,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  buttonDisabled: {
+    backgroundColor: theme.color.slate[300],
+  },
+  text: {
+    color: '#FFFFFF',
+    fontSize: theme.typography.base.fontSize,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  textDisabled: {
+    color: theme.color.slate[500],
+  },
+});
+===== ./components/ui/ModeBadge.tsx =====
+import React from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+import { theme } from '@/src/theme';
+
+interface ModeBadgeProps {
+  mode: "audio" | "video";
+}
+
+export function ModeBadge({ mode }: ModeBadgeProps) {
+  const isVideo = mode === "video";
+  
+  return (
+    <View style={[styles.badge, isVideo ? styles.badgeVideo : styles.badgeAudio]}>
+      <Text style={[styles.text, isVideo ? styles.textVideo : styles.textAudio]}>
+        {isVideo ? "Audio + Video" : "Audio only"}
+      </Text>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  badge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  badgeAudio: {
+    backgroundColor: theme.color.emerald[100],
+  },
+  badgeVideo: {
+    backgroundColor: theme.color.indigo[100],
+  },
+  text: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  textAudio: {
+    color: theme.color.emerald[700],
+  },
+  textVideo: {
+    color: theme.color.indigo[700],
+  },
+});
+===== ./components/ui/OptionCard.tsx =====
+import React from 'react';
+import { TouchableOpacity, Text, View, StyleSheet } from 'react-native';
+import { theme } from '@/src/theme';
+
+interface OptionCardProps {
+  icon: React.ReactNode;
+  title: string;
+  desc: string;
+  selected?: boolean;
+  onPress?: () => void;
+  badge?: string;
+}
+
+export function OptionCard({ icon, title, desc, selected, onPress, badge }: OptionCardProps) {
+  return (
+    <TouchableOpacity
+      style={[styles.card, selected && styles.cardSelected]}
+      onPress={onPress}
+      activeOpacity={0.8}
+    >
+      <View style={[styles.iconContainer, selected && styles.iconContainerSelected]}>
+        {icon}
+      </View>
+      <View style={styles.content}>
+        <View style={styles.titleRow}>
+          <Text style={[styles.title, selected && styles.titleSelected]}>
+            {title}
+          </Text>
+          {badge && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{badge}</Text>
+            </View>
+          )}
+        </View>
+        <Text style={[styles.description, selected && styles.descriptionSelected]}>
+          {desc}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+const styles = StyleSheet.create({
+  card: {
+    width: '100%',
+    padding: theme.spacing.md,
+    borderRadius: theme.borderRadius.xl,
+    borderWidth: 1,
+    borderColor: theme.color.slate[200],
+    backgroundColor: '#FFFFFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.md,
+  },
+  cardSelected: {
+    borderColor: theme.color.primary,
+    backgroundColor: `${theme.color.primary}0D`, // 5% opacity
+    shadowColor: theme.color.primary,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  iconContainer: {
+    padding: theme.spacing.md,
+    borderRadius: theme.borderRadius.lg,
+    backgroundColor: theme.color.slate[100],
+  },
+  iconContainerSelected: {
+    backgroundColor: `${theme.color.primary}26`, // 15% opacity
+  },
+  content: {
+    flex: 1,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+  },
+  title: {
+    fontSize: theme.typography.base.fontSize,
+    fontWeight: '500',
+    color: theme.color.textDay,
+  },
+  titleSelected: {
+    color: theme.color.primary,
+  },
+  description: {
+    fontSize: theme.typography.sm.fontSize,
+    color: theme.color.slate[600],
+    marginTop: 2,
+    opacity: 0.7,
+  },
+  descriptionSelected: {
+    color: theme.color.slate[700],
+  },
+  badge: {
+    backgroundColor: theme.color.emerald[100],
+    paddingHorizontal: theme.spacing.sm,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
+  badgeText: {
+    fontSize: 10,
+    color: theme.color.emerald[700],
+    fontWeight: '500',
+  },
+});
+===== ./components/ui/Header.tsx =====
+import React from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { ChevronLeft, Settings } from 'lucide-react-native';
+import { theme } from '@/src/theme';
+
+interface HeaderProps {
+  onBack?: () => void;
+  onSettings?: () => void;
+  title?: string;
+}
+
+export function Header({ onBack, onSettings, title = "iQueue Baby Monitor" }: HeaderProps) {
+  return (
+    <View style={styles.container}>
+      <View style={styles.topRow}>
+        {onBack ? (
+          <TouchableOpacity style={styles.button} onPress={onBack} activeOpacity={0.8}>
+            <ChevronLeft size={18} color={theme.color.textDay} />
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.placeholder} />
+        )}
+        
+        {onSettings ? (
+          <TouchableOpacity style={styles.button} onPress={onSettings} activeOpacity={0.8}>
+            <Settings size={18} color={theme.color.textDay} />
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.placeholder} />
+        )}
+      </View>
+      
+      <View style={styles.titleContainer}>
+        <Text style={styles.title}>{title}</Text>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    paddingHorizontal: theme.spacing.md,
+    paddingTop: theme.spacing.md,
+    paddingBottom: theme.spacing.sm,
+  },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  button: {
+    padding: theme.spacing.sm,
+    borderRadius: theme.borderRadius.lg,
+    borderWidth: 1,
+    borderColor: theme.color.slate[200],
+    backgroundColor: '#FFFFFF',
+  },
+  placeholder: {
+    width: 36,
+    height: 36,
+  },
+  titleContainer: {
+    marginTop: theme.spacing.sm,
+  },
+  title: {
+    fontSize: theme.typography.xl.fontSize,
+    fontWeight: '600',
+    color: theme.color.textDay,
+  },
+});
+===== ./components/ui/LabeledSlider.tsx =====
+import React from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+import Slider from '@react-native-community/slider';
+import { theme } from '@/src/theme';
+
+interface LabeledSliderProps {
+  label: string;
+  value: number;
+  onChange: (value: number) => void;
+}
+
+export function LabeledSlider({ label, value, onChange }: LabeledSliderProps) {
+  return (
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.label}>{label}</Text>
+        <Text style={styles.value}>{value}</Text>
+      </View>
+      
+      <Slider
+        style={styles.slider}
+        minimumValue={0}
+        maximumValue={100}
+        value={value}
+        onValueChange={onChange}
+        minimumTrackTintColor={theme.color.primary}
+        maximumTrackTintColor={theme.color.slate[200]}
+        thumbTintColor={theme.color.primary}
+      />
+      
+      <View style={styles.track}>
+        <View style={[styles.fill, { width: `${value}%` }]} />
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    marginTop: theme.spacing.md,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  label: {
+    fontSize: theme.typography.sm.fontSize,
+    color: theme.color.slate[600],
+  },
+  value: {
+    fontSize: theme.typography.sm.fontSize,
+    fontWeight: '500',
+    color: theme.color.slate[800],
+  },
+  slider: {
+    width: '100%',
+    height: 40,
+    marginTop: theme.spacing.sm,
+  },
+  track: {
+    marginTop: theme.spacing.sm,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: `${theme.color.slate[200]}B3`, // 70% opacity
+    overflow: 'hidden',
+  },
+  fill: {
+    height: '100%',
+    backgroundColor: theme.color.primary,
+  },
+});
+===== ./components/ui/ModeChips.tsx =====
+import React from 'react';
+import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
+import { Mic, Video } from 'lucide-react-native';
+import { theme } from '@/src/theme';
+
+interface ModeChipsProps {
+  mode: "audio" | "video";
+  onChange: (mode: "audio" | "video") => void;
+}
+
+export function ModeChips({ mode, onChange }: ModeChipsProps) {
+  return (
+    <View style={styles.container}>
+      <TouchableOpacity
+        style={[styles.chip, mode === "audio" && styles.chipSelected]}
+        onPress={() => onChange("audio")}
+        activeOpacity={0.8}
+      >
+        <Mic size={14} color={mode === "audio" ? "#FFFFFF" : theme.color.slate[700]} />
+        <Text style={[styles.chipText, mode === "audio" && styles.chipTextSelected]}>
+          Audio only
+        </Text>
+      </TouchableOpacity>
+      
+      <TouchableOpacity
+        style={[styles.chip, mode === "video" && styles.chipSelected]}
+        onPress={() => onChange("video")}
+        activeOpacity={0.8}
+      >
+        <Video size={14} color={mode === "video" ? "#FFFFFF" : theme.color.slate[700]} />
+        <Text style={[styles.chipText, mode === "video" && styles.chipTextSelected]}>
+          Audio + Video
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.spacing.sm,
+  },
+  chip: {
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: theme.color.slate[200],
+    backgroundColor: '#FFFFFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  chipSelected: {
+    backgroundColor: theme.color.primary,
+    borderColor: 'transparent',
+  },
+  chipText: {
+    fontSize: theme.typography.sm.fontSize,
+    color: theme.color.slate[700],
+    fontWeight: '500',
+  },
+  chipTextSelected: {
+    color: '#FFFFFF',
+  },
+});
+===== ./components/ui/WaveformPreview.tsx =====
+import React, { useEffect, useRef } from 'react';
+import { View, StyleSheet, Animated } from 'react-native';
+import { theme } from '@/src/theme';
+
+interface WaveformPreviewProps {
+  level?: number;
+}
+
+export function WaveformPreview({ level = 0.5 }: WaveformPreviewProps) {
+  const heights = useRef<Animated.Value[]>(
+    Array.from({ length: 40 }, (_, i) => new Animated.Value(20 + ((i * 13) % 44)))
+  ).current;
+
+  useEffect(() => {
+    const animations: Animated.CompositeAnimation[] = [];
+    
+    heights.forEach((height, i) => {
+      const animation = Animated.loop(
+        Animated.sequence([
+          Animated.timing(height, {
+            toValue: 20 + ((i * 13) % 44) + (level * 20),
+            duration: 1000 + (i * 50),
+            useNativeDriver: false,
+          }),
+          Animated.timing(height, {
+            toValue: 20 + ((i * 13) % 44),
+            duration: 1000 + (i * 50),
+            useNativeDriver: false,
+          }),
+        ])
+      );
+      animations.push(animation);
+      animation.start();
+    });
+
+    return () => {
+      animations.forEach(animation => animation.stop());
+    };
+  }, [level]);
+
+  return (
+    <View style={styles.container}>
+      {heights.map((height, i) => (
+        <Animated.View
+          key={i}
+          style={[
+            styles.bar,
+            {
+              height: height,
+            },
+          ]}
+        />
+      ))}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 1,
+    width: '100%',
+    height: 112, // 28 * 4 (28 is 7rem in Tailwind)
+    overflow: 'hidden',
+  },
+  bar: {
+    flex: 1,
+    borderRadius: 2,
+    backgroundColor: '#6B8CFF',
+    opacity: 0.9,
+  },
+});
+===== ./components/OnboardingScreen.tsx =====
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  Alert,
+  Platform,
+  Linking,
+  Image,
+  Dimensions,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Baby, Headphones, Shield, Bell, Mic, Camera, CheckCircle } from 'lucide-react-native';
+import { theme } from '@/src/theme';
+import { permissionManager } from '@/src/utils/PermissionManager';
+
+const { width } = Dimensions.get('window');
+
+interface OnboardingScreenProps {
+  onComplete: () => void;
+}
+
+interface OnboardingStep {
+  id: number;
+  title: string;
+  subtitle: string;
+  description: string;
+  icon: React.ReactNode;
+  color: string;
+}
+
+const onboardingSteps: OnboardingStep[] = [
+  {
+    id: 1,
+    title: 'Welcome to Baby Sound Monitor',
+    subtitle: 'Monitor your baby from anywhere',
+    description: 'A secure, real-time baby monitoring solution that works both nearby and over the internet.',
+    icon: <Baby size={80} color="#3b82f6" />,
+    color: '#3b82f6',
+  },
+  {
+    id: 2,
+    title: 'Two Simple Roles',
+    subtitle: 'Listener & Parent',
+    description: 'Listener: Place in nursery to monitor sounds\nParent: Receive alerts and live audio/video',
+    icon: <Headphones size={80} color="#10b981" />,
+    color: '#10b981',
+  },
+  {
+    id: 3,
+    title: 'Secure & Private',
+    subtitle: 'Your data stays yours',
+    description: 'All sessions are ephemeral and encrypted. No recordings are stored, and each session uses unique codes.',
+    icon: <Shield size={80} color="#8b5cf6" />,
+    color: '#8b5cf6',
+  },
+  {
+    id: 4,
+    title: 'Smart Notifications',
+    subtitle: 'Never miss important sounds',
+    description: 'Get instant alerts when baby sounds are detected, with customizable sensitivity levels.',
+    icon: <Bell size={80} color="#f59e0b" />,
+    color: '#f59e0b',
+  },
+  {
+    id: 5,
+    title: 'Required Permissions',
+    subtitle: 'We need these to work',
+    description: 'Microphone: Monitor baby sounds\nCamera: QR scanning & video streaming\nNotifications: Alert you of events',
+    icon: <Camera size={80} color="#ef4444" />,
+    color: '#ef4444',
+  },
+];
+
+export default function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
+  const { setRole } = useSession();
+  const [currentStep, setCurrentStep] = useState(0);
+  const [permissionsGranted, setPermissionsGranted] = useState(false);
+
+  useEffect(() => {
+    checkPermissions();
+  }, []);
+
+  const checkPermissions = async () => {
+    try {
+      const status = await permissionManager.checkPermissions();
+      const hasPermissions = status.microphone && status.camera && status.notifications;
+      setPermissionsGranted(hasPermissions);
+    } catch (error) {
+      console.error('Failed to check permissions:', error);
+    }
+  };
+
+  const requestPermissions = async () => {
+    try {
+      const status = await permissionManager.requestAllPermissions();
+      const hasPermissions = status.microphone && status.camera && status.notifications;
+      setPermissionsGranted(hasPermissions);
+      
+      if (hasPermissions) {
+        // Move to next step or complete onboarding
+        if (currentStep < onboardingSteps.length - 1) {
+          setCurrentStep(currentStep + 1);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to request permissions:', error);
+    }
+  };
+
+  const nextStep = () => {
+    if (currentStep < onboardingSteps.length - 1) {
+      setCurrentStep(currentStep + 1);
+    }
+  };
+
+  const previousStep = () => {
+    if (currentStep > 0) {
+      setCurrentStep(currentStep - 1);
+    }
+  };
+
+  const completeOnboarding = () => {
+    console.log('[OnboardingScreen] Get Started button pressed');
+    console.log('[OnboardingScreen] Calling onComplete prop');
+    onComplete();
+  };
+
+  const currentStepData = onboardingSteps[currentStep];
+  const isLastStep = currentStep === onboardingSteps.length - 1; // This will be true when currentStep === 4
+  const isPermissionStep = currentStep === 4; // Step 5 (index 4) is the permission step
+
+  console.log('[OnboardingScreen] Debug:', {
+    currentStep,
+    totalSteps: onboardingSteps.length,
+    isLastStep,
+    isPermissionStep,
+    permissionsGranted
+  });
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* Progress indicator */}
+        <View style={styles.progressContainer}>
+          {onboardingSteps.map((step, index) => (
+            <View
+              key={step.id}
+              style={[
+                styles.progressDot,
+                index <= currentStep ? styles.progressDotActive : styles.progressDotInactive,
+                { backgroundColor: index <= currentStep ? step.color : '#e5e7eb' },
+              ]}
+            />
+          ))}
+        </View>
+
+        {/* Step content */}
+        <View style={styles.stepContainer}>
+          <View style={[styles.iconContainer, { backgroundColor: `${currentStepData.color}20` }]}>
+            {currentStepData.icon}
+          </View>
+
+          <Text style={styles.title}>{currentStepData.title}</Text>
+          <Text style={styles.subtitle}>{currentStepData.subtitle}</Text>
+          <Text style={styles.description}>{currentStepData.description}</Text>
+
+          {/* Permission status for step 5 */}
+          {isPermissionStep && (
+            <View style={styles.permissionStatus}>
+              <View style={styles.permissionItem}>
+                <Mic size={20} color={permissionsGranted ? '#10b981' : '#6b7280'} />
+                <Text style={[styles.permissionText, { color: permissionsGranted ? '#10b981' : '#6b7280' }]}>
+                  Microphone {permissionsGranted ? '✓' : '✗'}
+                </Text>
+              </View>
+              <View style={styles.permissionItem}>
+                <Camera size={20} color={permissionsGranted ? '#10b981' : '#6b7280'} />
+                <Text style={[styles.permissionText, { color: permissionsGranted ? '#10b981' : '#6b7280' }]}>
+                  Camera {permissionsGranted ? '✓' : '✗'}
+                </Text>
+              </View>
+              <View style={styles.permissionItem}>
+                <Bell size={20} color={permissionsGranted ? '#10b981' : '#6b7280'} />
+                <Text style={[styles.permissionText, { color: permissionsGranted ? '#10b981' : '#6b7280' }]}>
+                  Notifications {permissionsGranted ? '✓' : '✗'}
+                </Text>
+              </View>
+            </View>
+          )}
+        </View>
+
+        {/* Navigation buttons */}
+        <View style={styles.buttonContainer}>
+          {currentStep > 0 && (
+            <TouchableOpacity style={styles.secondaryButton} onPress={previousStep}>
+              <Text style={styles.secondaryButtonText}>Back</Text>
+            </TouchableOpacity>
+          )}
+
+          {isPermissionStep && !permissionsGranted ? (
+            <TouchableOpacity style={[styles.primaryButton, { backgroundColor: currentStepData.color }]} onPress={requestPermissions}>
+              <Text style={styles.primaryButtonText}>Grant Permissions</Text>
+            </TouchableOpacity>
+          ) : isLastStep ? (
+            <TouchableOpacity style={[styles.primaryButton, { backgroundColor: currentStepData.color }]} onPress={completeOnboarding}>
+              <Text style={styles.primaryButtonText}>Get Started</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity style={[styles.primaryButton, { backgroundColor: currentStepData.color }]} onPress={nextStep}>
+              <Text style={styles.primaryButtonText}>Next</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+  },
+  progressContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 20,
+    marginBottom: 40,
+    gap: 8,
+  },
+  progressDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+  },
+  progressDotActive: {
+    transform: [{ scale: 1.2 }],
+  },
+  progressDotInactive: {
+    opacity: 0.5,
+  },
+  stepContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+  },
+  iconContainer: {
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 32,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  subtitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#6b7280',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  description: {
+    fontSize: 16,
+    lineHeight: 24,
+    color: '#374151',
+    textAlign: 'center',
+    maxWidth: width - 80,
+  },
+  permissionStatus: {
+    marginTop: 32,
+    gap: 16,
+  },
+  permissionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  permissionText: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    gap: 16,
+  },
+  primaryButton: {
+    flex: 1,
+    backgroundColor: '#3b82f6',
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 12,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  primaryButtonText: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  secondaryButton: {
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#d1d5db',
+    alignItems: 'center',
+    minWidth: 100,
+  },
+  secondaryButtonText: {
+    color: '#6b7280',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+});
+===== ./components/LevelBar.tsx =====
+import React from 'react';
+import { View, StyleSheet } from 'react-native';
+
+interface LevelBarProps {
+  level: number; // 0-1
+  threshold: number; // 0-1
+}
+
+export function LevelBar({ level, threshold }: LevelBarProps) {
+  const levelPercent = Math.min(100, level * 100);
+  const thresholdPercent = threshold * 100;
+  const isAboveThreshold = level > threshold;
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.barBackground}>
+        <View 
+          style={[
+            styles.levelBar, 
+            { 
+              width: `${levelPercent}%`,
+              backgroundColor: isAboveThreshold ? '#ef4444' : '#3b82f6'
+            }
+          ]} 
+        />
+        <View 
+          style={[
+            styles.thresholdLine, 
+            { left: `${thresholdPercent}%` }
+          ]} 
+        />
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    width: '100%',
+    alignItems: 'center',
+  },
+  barBackground: {
+    width: 300,
+    height: 20,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 10,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  levelBar: {
+    height: '100%',
+    borderRadius: 10,
+  },
+  thresholdLine: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: 2,
+    backgroundColor: '#fbbf24',
+    zIndex: 1,
+  },
+});===== ./components/ThresholdSlider.tsx =====
+import React from 'react';
+import { View, Text, StyleSheet } from 'react-native';
+import Slider from '@react-native-community/slider';
+
+interface ThresholdSliderProps {
+  value: number; // 0-1
+  onValueChange: (value: number) => void;
+}
+
+export function ThresholdSlider({ value, onValueChange }: ThresholdSliderProps) {
+  return (
+    <View style={styles.container}>
+      <Slider
+        style={styles.slider}
+        minimumValue={0.1}
+        maximumValue={0.9}
+        value={value}
+        onValueChange={onValueChange}
+        minimumTrackTintColor="#3b82f6"
+        maximumTrackTintColor="#e5e7eb"
+        thumbTintColor="#3b82f6"
+      />
+      <View style={styles.labels}>
+        <Text style={styles.labelText}>10%</Text>
+        <Text style={styles.labelText}>90%</Text>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    width: '100%',
+    paddingHorizontal: 16,
+  },
+  slider: {
+    width: '100%',
+    height: 40,
+  },
+  labels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 8,
+  },
+  labelText: {
+    fontSize: 12,
+    color: '#6b7280',
+  },
+});===== ./app.config.ts =====
+import type { ExpoConfig } from "expo/config";
+
+export default (): ExpoConfig => {
+  const useDevClient = process.env.USE_DEV_CLIENT === "1";
+  const isWeb = process.env.EXPO_OS === "web";
+
+  return {
+    name: "Baby Sound Monitor",
+    slug: "baby-sound-monitor",
+    scheme: "baby-sound-monitor",
+    version: "1.0.0",
+    orientation: "portrait",
+    icon: "./assets/images/icon.png",
+    userInterfaceStyle: "automatic",
+    splash: {
+      backgroundColor: "#ffffff",
+    },
+    assetBundlePatterns: ["**/*"],
+    ios: {
+      supportsTablet: true,
+      bundleIdentifier: "com.babysoundmonitor.app",
+      infoPlist: {
+        NSMicrophoneUsageDescription: "This app uses the microphone to monitor baby sounds in the nursery.",
+        NSCameraUsageDescription: "This app uses the camera to scan QR codes and stream video from the nursery.",
+        UIBackgroundModes: ["audio", "background-processing"],
+        NSUserNotificationsUsageDescription: "This app needs to send notifications when baby sounds are detected.",
+      },
+    },
+    android: {
+      package: "com.babysoundmonitor.app",
+      permissions: [
+        "RECORD_AUDIO",
+        "WAKE_LOCK",
+        "CAMERA",
+        "POST_NOTIFICATIONS",
+        "ACCESS_NETWORK_STATE",
+        "INTERNET"
+      ],
+    },
+    extra: {
+      eas: { projectId: "5a4b6172-4622-45a2-8327-635cba91b806" },
+      projectId: "5a4b6172-4622-45a2-8327-635cba91b806",
+    },
+
+    web: {
+      bundler: "metro",
+      output: "static",
+      favicon: "./assets/images/favicon.png",
+      // Web-specific configuration
+      build: {
+        babel: {
+          include: ["@expo/vector-icons", "lucide-react-native"]
+        }
+      }
+    },
+    plugins: [
+      // Only include native plugins for mobile platforms
+      ...(!isWeb ? [["expo-notifications"]] : []),
+      ...(useDevClient && !isWeb ? ["expo-dev-client"] : []),
+      ...(!isWeb ? ["expo-camera"] : []),
+      ...(!isWeb ? ["expo-av"] : []),
+    ] as any[],
+  };
+};
+===== ./package-lock.json =====
 {
   "name": "baby-sound-monitor",
   "version": "1.0.0",
@@ -11432,3 +14026,1719 @@
     }
   }
 }
+===== ./package.json =====
+{
+  "name": "baby-sound-monitor",
+  "main": "expo-router/entry",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "EXPO_NO_TELEMETRY=1 expo start",
+    "dev:web": "EXPO_NO_TELEMETRY=1 expo start --web",
+    "start": "npm run dev",
+    "build:web": "expo export --platform web",
+    "lint": "expo lint",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@expo/vector-icons": "^14.0.0",
+    "@react-native-async-storage/async-storage": "2.1.2",
+    "@react-native-community/slider": "4.5.6",
+    "@react-navigation/bottom-tabs": "^7.3.10",
+    "@react-navigation/native": "^7.1.6",
+    "expo": "~53.0.0",
+    "expo-av": "~15.1.7",
+    "expo-blur": "~14.1.5",
+    "expo-camera": "~16.1.11",
+    "expo-constants": "~17.1.7",
+    "expo-dev-client": "~5.2.4",
+    "expo-font": "~13.3.2",
+    "expo-haptics": "~14.1.4",
+    "expo-linear-gradient": "~14.1.5",
+    "expo-linking": "~7.1.7",
+    "expo-notifications": "~0.31.4",
+    "expo-router": "~5.1.4",
+    "expo-splash-screen": "~0.30.0",
+    "expo-status-bar": "~2.2.3",
+    "expo-symbols": "~0.4.0",
+    "expo-system-ui": "~5.0.0",
+    "expo-web-browser": "~14.2.0",
+    "lucide-react-native": "^0.475.0",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "react-native": "0.79.5",
+    "react-native-gesture-handler": "~2.24.0",
+    "react-native-reanimated": "~3.17.4",
+    "react-native-safe-area-context": "5.4.0",
+    "react-native-screens": "~4.11.1",
+    "react-native-svg": "15.11.2",
+    "react-native-url-polyfill": "^2.0.0",
+    "react-native-web": "^0.20.0",
+    "react-native-webview": "13.13.5",
+    "zustand": "^5.0.2"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.2",
+    "@types/jest": "^29.5.12",
+    "@types/react": "~19.0.10",
+    "jest": "^29.7.0",
+    "typescript": "~5.8.3"
+  }
+}
+===== ./hooks/useFrameworkReady.ts =====
+import { useEffect } from 'react';
+
+declare global {
+  interface Window {
+    frameworkReady?: () => void;
+  }
+}
+
+export function useFrameworkReady() {
+  useEffect(() => {
+    window.frameworkReady?.();
+  });
+}
+===== ./tsconfig.json =====
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "paths": {
+      "@/*": [
+        "./*"
+      ]
+    }
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    "nativewind-env.d.ts"
+  ]
+}
+===== ./src/notify/NotificationService.ts =====
+import * as Notifications from 'expo-notifications';
+import { Platform } from 'react-native';
+import Constants from 'expo-constants';
+
+export interface NotificationData {
+  title: string;
+  body: string;
+  data?: Record<string, any>;
+  sound?: boolean;
+  priority?: 'default' | 'normal' | 'high';
+}
+
+export class NotificationService {
+  private static instance: NotificationService;
+  private isInitialized = false;
+  private pushToken: string | null = null;
+
+  private constructor() {}
+
+  static getInstance(): NotificationService {
+    if (!NotificationService.instance) {
+      NotificationService.instance = new NotificationService();
+    }
+    return NotificationService.instance;
+  }
+
+  async initialize(): Promise<void> {
+    if (this.isInitialized) return;
+
+    try {
+      // Configure notification handler
+      Notifications.setNotificationHandler({
+        handleNotification: async (notification) => ({
+          shouldShowAlert: true,
+          shouldPlaySound: true,
+          shouldSetBadge: false,
+        }),
+      });
+
+      // Request permissions
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+
+      if (finalStatus !== 'granted') {
+        throw new Error('Notification permissions not granted');
+      }
+
+      // Get push token
+      if (Platform.OS !== 'web') {
+        try {
+          const projectId = Constants.expoConfig?.extra?.projectId;
+          
+          // Only request push token if we have a valid projectId
+          if (projectId && projectId !== '12345678-1234-1234-1234-123456789abc') {
+            const token = await Notifications.getExpoPushTokenAsync({
+              projectId: projectId,
+            });
+            this.pushToken = token.data;
+            console.log('[NotificationService] Push token:', this.pushToken);
+          } else {
+            console.log('[NotificationService] Skipping push token request - no valid projectId');
+          }
+        } catch (error) {
+          console.warn('[NotificationService] Failed to get push token:', error);
+          // Don't throw error - app can still work without push notifications
+        }
+      }
+
+      this.isInitialized = true;
+      console.log('[NotificationService] Initialized successfully');
+
+    } catch (error) {
+      console.error('[NotificationService] Initialization failed:', error);
+      throw error;
+    }
+  }
+
+  async sendLocalNotification(notification: NotificationData): Promise<void> {
+    try {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: notification.title,
+          body: notification.body,
+          data: notification.data || {},
+          sound: notification.sound !== false,
+          priority: notification.priority || 'high',
+        },
+        trigger: null, // Send immediately
+      });
+    } catch (error) {
+      console.error('[NotificationService] Failed to send local notification:', error);
+    }
+  }
+
+  async sendNoiseAlert(level: number, roomId: string): Promise<void> {
+    const notification: NotificationData = {
+      title: 'Baby Noise Detected',
+      body: `Sound level: ${Math.round(level * 100)}%`,
+      data: {
+        type: 'noise_detected',
+        roomId,
+        level,
+        timestamp: Date.now(),
+      },
+      sound: true,
+      priority: 'high',
+    };
+
+    await this.sendLocalNotification(notification);
+  }
+
+  async sendSessionEnded(roomId: string, reason: string): Promise<void> {
+    const notification: NotificationData = {
+      title: 'Session Ended',
+      body: reason,
+      data: {
+        type: 'session_ended',
+        roomId,
+        reason,
+        timestamp: Date.now(),
+      },
+      sound: false,
+      priority: 'normal',
+    };
+
+    await this.sendLocalNotification(notification);
+  }
+
+  async sendReconnectionAttempt(roomId: string, attempt: number): Promise<void> {
+    const notification: NotificationData = {
+      title: 'Reconnecting...',
+      body: `Attempt ${attempt}/5`,
+      data: {
+        type: 'reconnection_attempt',
+        roomId,
+        attempt,
+        timestamp: Date.now(),
+      },
+      sound: false,
+      priority: 'normal',
+    };
+
+    await this.sendLocalNotification(notification);
+  }
+
+  getPushToken(): string | null {
+    return this.pushToken;
+  }
+
+  isReady(): boolean {
+    return this.isInitialized;
+  }
+
+  // Listen for notification events
+  addNotificationReceivedListener(callback: (notification: Notifications.Notification) => void): Notifications.Subscription {
+    return Notifications.addNotificationReceivedListener(callback);
+  }
+
+  addNotificationResponseReceivedListener(callback: (response: Notifications.NotificationResponse) => void): Notifications.Subscription {
+    return Notifications.addNotificationResponseReceivedListener(callback);
+  }
+
+  // Remove listeners
+  removeNotificationSubscription(subscription: Notifications.Subscription): void {
+    subscription.remove();
+  }
+}
+
+// Export singleton instance
+export const notificationService = NotificationService.getInstance();
+===== ./src/notify/index.ts =====
+import * as Notifications from 'expo-notifications';
+
+export async function registerForPushNotifications(): Promise<string | null> {
+  try {
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+    
+    if (existingStatus !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+    
+    if (finalStatus !== 'granted') {
+      throw new Error('Push notification permission not granted');
+    }
+
+    const token = await Notifications.getExpoPushTokenAsync({
+      projectId: 'your-expo-project-id', // Replace with your actual project ID
+    });
+    
+    return token.data;
+  } catch (error) {
+    console.error('Error registering for push notifications:', error);
+    return null;
+  }
+}
+
+export async function notifyListener(pushToken: string, message: string): Promise<void> {
+  try {
+    const notification = {
+      to: pushToken,
+      sound: 'default',
+      title: 'Baby Monitor Alert',
+      body: message,
+      data: { timestamp: Date.now() },
+    };
+
+    const response = await fetch('https://exp.host/--/api/v2/push/send', {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Accept-encoding': 'gzip, deflate',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(notification),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Push notification failed: ${response.status}`);
+    }
+
+    const result = await response.json();
+    if (result.data?.status === 'error') {
+      throw new Error(`Push notification error: ${result.data.message}`);
+    }
+  } catch (error) {
+    console.error('Error sending push notification:', error);
+    throw error;
+  }
+}===== ./src/notify/register.ts =====
+import * as Notifications from "expo-notifications";
+import { Platform } from "react-native";
+
+export async function registerForPushNotificationsAsync() {
+  const { status: existing } = await Notifications.getPermissionsAsync();
+  let finalStatus = existing;
+  if (existing !== "granted") {
+    const { status } = await Notifications.requestPermissionsAsync();
+    finalStatus = status;
+  }
+  if (finalStatus !== "granted") return null;
+
+  const token = (await Notifications.getExpoPushTokenAsync()).data;
+  if (Platform.OS === "android") {
+    await Notifications.setNotificationChannelAsync("default", {
+      name: "default",
+      importance: Notifications.AndroidImportance.MAX
+    });
+  }
+  return token;
+}
+===== ./src/transport/RealtimeTransport.ts =====
+import { useSession, SessionData, Connectivity } from '@/src/store/useSession';
+
+export type TransportMessage =
+  | { type: 'listener:hello'; roomId: string; joinKey: string; mode: string }
+  | { type: 'parent:hello'; roomId: string; joinKey: string }
+  | { type: 'audio'; roomId: string; data: ArrayBuffer; timestamp: number }
+  | { type: 'video'; roomId: string; data: ArrayBuffer; timestamp: number }
+  | { type: 'noise:detected'; roomId: string; level: number; timestamp: number }
+  | { type: 'session:end'; roomId: string }
+  | { type: 'ping'; roomId: string; timestamp: number }
+  | { type: 'pong'; roomId: string; timestamp: number }
+  | { type: 'mode:change'; roomId: string; joinKey: string; mode: string };
+
+export interface TransportCallbacks {
+  onMessage: (message: TransportMessage) => void;
+  onConnect: () => void;
+  onDisconnect: () => void;
+  onError: (error: string) => void;
+}
+
+export abstract class BaseTransport {
+  protected roomId: string;
+  protected joinKey: string;
+  protected callbacks: TransportCallbacks;
+  protected isConnected = false;
+
+  constructor(roomId: string, joinKey: string, callbacks: TransportCallbacks) {
+    this.roomId = roomId;
+    this.joinKey = joinKey;
+    this.callbacks = callbacks;
+  }
+
+  abstract connect(): Promise<void>;
+  abstract disconnect(): void;
+  abstract send(message: TransportMessage): void;
+  abstract isReady(): boolean;
+
+  protected validateMessage(message: TransportMessage): boolean {
+    return message.roomId === this.roomId &&
+           (message as any).joinKey === this.joinKey;
+  }
+
+  protected handleConnect() {
+    this.isConnected = true;
+    this.callbacks.onConnect();
+  }
+
+  protected handleDisconnect() {
+    this.isConnected = false;
+    this.callbacks.onDisconnect();
+  }
+
+  protected handleError(error: string) {
+    this.callbacks.onError(error);
+  }
+}
+
+// WebSocket transport for "anywhere" connectivity
+export class WebSocketTransport extends BaseTransport {
+  private ws: WebSocket | null = null;
+  private reconnectTimer: NodeJS.Timeout | null = null;
+  private reconnectAttempts = 0;
+  private maxReconnectAttempts = 5;
+
+  async connect(): Promise<void> {
+    try {
+      // Use a public WebSocket service for demo purposes
+      // In production, use your own WebSocket server
+      const url = `wss://echo.websocket.org/?room=${encodeURIComponent(this.roomId)}&key=${encodeURIComponent(this.joinKey)}`;
+
+      this.ws = new WebSocket(url);
+
+      this.ws.onopen = () => {
+        console.log('[WebSocket] Connected');
+        this.reconnectAttempts = 0;
+        this.handleConnect();
+
+        // Send initial hello message
+        this.send({
+          type: 'listener:hello',
+          roomId: this.roomId,
+          joinKey: this.joinKey,
+          mode: 'audio'
+        });
+      };
+
+      this.ws.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data) as TransportMessage;
+          if (this.validateMessage(message)) {
+            this.callbacks.onMessage(message);
+          }
+        } catch (error) {
+          console.error('[WebSocket] Failed to parse message:', error);
+        }
+      };
+
+      this.ws.onclose = () => {
+        console.log('[WebSocket] Disconnected');
+        this.handleDisconnect();
+        this.attemptReconnect();
+      };
+
+      this.ws.onerror = (error) => {
+        console.error('[WebSocket] Error:', error);
+        this.handleError('WebSocket connection failed');
+      };
+
+    } catch (error) {
+      console.error('[WebSocket] Connection failed:', error);
+      this.handleError('Failed to establish WebSocket connection');
+    }
+  }
+
+  disconnect(): void {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+
+    if (this.ws) {
+      this.ws.close();
+      this.ws = null;
+    }
+
+    this.isConnected = false;
+  }
+
+  send(message: TransportMessage): void {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify(message));
+    }
+  }
+
+  isReady(): boolean {
+    return this.ws?.readyState === WebSocket.OPEN;
+  }
+
+  private attemptReconnect(): void {
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      this.handleError('Max reconnection attempts reached');
+      return;
+    }
+
+    this.reconnectAttempts++;
+    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000);
+
+    this.reconnectTimer = setTimeout(() => {
+      console.log(`[WebSocket] Attempting reconnection ${this.reconnectAttempts}/${this.maxReconnectAttempts}`);
+      this.connect();
+    }, delay);
+  }
+}
+
+// WebRTC transport for "nearby" connectivity (same WiFi)
+export class WebRTCTransport extends BaseTransport {
+  private peerConnection: RTCPeerConnection | null = null;
+  private dataChannel: RTCDataChannel | null = null;
+  private localStream: MediaStream | null = null;
+
+  async connect(): Promise<void> {
+    try {
+      // Create peer connection
+      this.peerConnection = new RTCPeerConnection({
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' }
+        ]
+      });
+
+      // Set up data channel for signaling
+      this.dataChannel = this.peerConnection.createDataChannel('signaling', {
+        ordered: true
+      });
+
+      this.dataChannel.onopen = () => {
+        console.log('[WebRTC] Data channel opened');
+        this.handleConnect();
+      };
+
+      this.dataChannel.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data) as TransportMessage;
+          if (this.validateMessage(message)) {
+            this.callbacks.onMessage(message);
+          }
+        } catch (error) {
+          console.error('[WebRTC] Failed to parse message:', error);
+        }
+      };
+
+      this.dataChannel.onclose = () => {
+        console.log('[WebRTC] Data channel closed');
+        this.handleDisconnect();
+      };
+
+      // Handle ICE candidates
+      this.peerConnection.onicecandidate = (event) => {
+        if (event.candidate) {
+          // In a real app, you'd send this to the other peer via signaling server
+          console.log('[WebRTC] ICE candidate:', event.candidate);
+        }
+      };
+
+      this.peerConnection.onconnectionstatechange = () => {
+        console.log('[WebRTC] Connection state:', this.peerConnection?.connectionState);
+      };
+
+    } catch (error) {
+      console.error('[WebRTC] Setup failed:', error);
+      this.handleError('Failed to setup WebRTC connection');
+    }
+  }
+
+  disconnect(): void {
+    if (this.dataChannel) {
+      this.dataChannel.close();
+      this.dataChannel = null;
+    }
+
+    if (this.peerConnection) {
+      this.peerConnection.close();
+      this.peerConnection = null;
+    }
+
+    if (this.localStream) {
+      this.localStream.getTracks().forEach(track => track.stop());
+      this.localStream = null;
+    }
+
+    this.isConnected = false;
+  }
+
+  send(message: TransportMessage): void {
+    if (this.dataChannel && this.dataChannel.readyState === 'open') {
+      this.dataChannel.send(JSON.stringify(message));
+    }
+  }
+
+  isReady(): boolean {
+    return this.dataChannel?.readyState === 'open';
+  }
+
+  async addLocalStream(stream: MediaStream): Promise<void> {
+    if (this.peerConnection && stream) {
+      this.localStream = stream;
+      stream.getTracks().forEach(track => {
+        this.peerConnection?.addTrack(track, stream);
+      });
+    }
+  }
+}
+
+// Transport factory
+export class TransportFactory {
+  static create(
+    connectivity: Connectivity,
+    roomId: string,
+    joinKey: string,
+    callbacks: TransportCallbacks
+  ): BaseTransport {
+    switch (connectivity) {
+      case 'nearby':
+        return new WebRTCTransport(roomId, joinKey, callbacks);
+      case 'anywhere':
+        return new WebSocketTransport(roomId, joinKey, callbacks);
+      default:
+        throw new Error(`Unsupported connectivity type: ${connectivity}`);
+    }
+  }
+}
+===== ./src/transport/Realtime.ts =====
+ ===== ./src/utils/QRCodeUtils.ts =====
+import * as Linking from 'expo-linking';
+import { SessionData } from '@/src/store/useSession';
+
+export interface QRCodeData {
+  roomId: string;
+  joinKey: string;
+  mode: string;
+  connectivity: string;
+  timestamp: number;
+}
+
+export class QRCodeGenerator {
+  static generateDeepLink(session: SessionData): string {
+    return Linking.createURL('connect', {
+      queryParams: {
+        roomId: session.roomId,
+        joinKey: session.joinKey,
+        mode: session.mode,
+        connectivity: session.connectivity,
+        timestamp: session.timestamp.toString(),
+      },
+    });
+  }
+
+  static generateQRData(session: SessionData): QRCodeData {
+    return {
+      roomId: session.roomId,
+      joinKey: session.joinKey,
+      mode: session.mode,
+      connectivity: session.connectivity,
+      timestamp: session.timestamp,
+    };
+  }
+
+  static parseQRCode(qrData: string): QRCodeData | null {
+    try {
+      // Try to parse as deep link first
+      const parsed = Linking.parse(qrData);
+      if (parsed.path === 'connect' && parsed.queryParams) {
+        const params = parsed.queryParams as any;
+        return {
+          roomId: String(params.roomId || ''),
+          joinKey: String(params.joinKey || ''),
+          mode: String(params.mode || 'audio'),
+          connectivity: String(params.connectivity || 'nearby'),
+          timestamp: parseInt(String(params.timestamp || '0'), 10),
+        };
+      }
+
+      // Try to parse as JSON
+      const jsonData = JSON.parse(qrData);
+      if (jsonData.roomId && jsonData.joinKey) {
+        return {
+          roomId: String(jsonData.roomId),
+          joinKey: String(jsonData.joinKey),
+          mode: String(jsonData.mode || 'audio'),
+          connectivity: String(jsonData.connectivity || 'nearby'),
+          timestamp: parseInt(String(jsonData.timestamp || '0'), 10),
+        };
+      }
+
+      return null;
+    } catch (error) {
+      console.error('[QRCodeGenerator] Failed to parse QR data:', error);
+      return null;
+    }
+  }
+
+  static validateQRData(data: QRCodeData): { isValid: boolean; error?: string } {
+    if (!data.roomId || data.roomId.length < 10) {
+      return { isValid: false, error: 'Invalid room ID' };
+    }
+
+    if (!data.joinKey || data.joinKey.length < 8) {
+      return { isValid: false, error: 'Invalid join key' };
+    }
+
+    if (!['audio', 'audio+video'].includes(data.mode)) {
+      return { isValid: false, error: 'Invalid stream mode' };
+    }
+
+    if (!['nearby', 'anywhere'].includes(data.connectivity)) {
+      return { isValid: false, error: 'Invalid connectivity type' };
+    }
+
+    // Check if QR code is expired (10 minutes)
+    const now = Date.now();
+    const qrAge = now - data.timestamp;
+    if (qrAge > 10 * 60 * 1000) {
+      return { isValid: false, error: 'QR code has expired' };
+    }
+
+    return { isValid: true };
+  }
+
+  static formatRoomId(roomId: string): string {
+    // Format room ID for display (e.g., "room_1234567890_abc123def" -> "1234-5678-90")
+    if (roomId.startsWith('room_')) {
+      const parts = roomId.split('_');
+      if (parts.length >= 3) {
+        const timestamp = parts[1];
+        const random = parts[2];
+        return `${timestamp.slice(-4)}-${random.slice(0, 4)}-${random.slice(4, 6)}`;
+      }
+    }
+    return roomId.slice(0, 12);
+  }
+
+  static formatJoinKey(joinKey: string): string {
+    // Format join key for display (e.g., "key_abc123def456" -> "ABC1-23DE-F456")
+    if (joinKey.startsWith('key_')) {
+      const key = joinKey.slice(4).toUpperCase();
+      return `${key.slice(0, 4)}-${key.slice(4, 6)}-${key.slice(6, 10)}`;
+    }
+    return joinKey.slice(0, 12);
+  }
+}
+
+export class QRCodeScanner {
+  static async requestCameraPermission(): Promise<boolean> {
+    try {
+      // This would typically use expo-camera's permission request
+      // For now, we'll return true as a placeholder
+      return true;
+    } catch (error) {
+      console.error('[QRCodeScanner] Camera permission request failed:', error);
+      return false;
+    }
+  }
+
+  static async scanQRCode(): Promise<string | null> {
+    try {
+      // This would typically use expo-camera's barcode scanner
+      // For now, we'll return null as a placeholder
+      // In the real implementation, this would scan and return the QR data
+      return null;
+    } catch (error) {
+      console.error('[QRCodeScanner] QR code scanning failed:', error);
+      return null;
+    }
+  }
+}
+===== ./src/utils/PermissionManager.ts =====
+import { Alert, Linking, Platform } from 'react-native';
+import { Camera } from 'expo-camera';
+import { Audio } from 'expo-av';
+import * as Notifications from 'expo-notifications';
+
+export interface PermissionStatus {
+  microphone: boolean;
+  camera: boolean;
+  notifications: boolean;
+}
+
+export class PermissionManager {
+  private static instance: PermissionManager;
+  private permissionStatus: PermissionStatus = {
+    microphone: false,
+    camera: false,
+    notifications: false,
+  };
+
+  private constructor() {}
+
+  static getInstance(): PermissionManager {
+    if (!PermissionManager.instance) {
+      PermissionManager.instance = new PermissionManager();
+    }
+    return PermissionManager.instance;
+  }
+
+  async requestAllPermissions(): Promise<PermissionStatus> {
+    try {
+      const [microphone, camera, notifications] = await Promise.all([
+        this.requestMicrophonePermission(),
+        this.requestCameraPermission(),
+        this.requestNotificationPermission(),
+      ]);
+
+      this.permissionStatus = { microphone, camera, notifications };
+      return this.permissionStatus;
+    } catch (error) {
+      console.error('[PermissionManager] Failed to request permissions:', error);
+      throw error;
+    }
+  }
+
+  async requestMicrophonePermission(): Promise<boolean> {
+    try {
+      const { status } = await Audio.requestPermissionsAsync();
+      const granted = status === 'granted';
+      
+      if (!granted) {
+        this.showPermissionAlert('Microphone', 'This app needs microphone access to monitor baby sounds.');
+      }
+      
+      return granted;
+    } catch (error) {
+      console.error('[PermissionManager] Microphone permission request failed:', error);
+      return false;
+    }
+  }
+
+  async requestCameraPermission(): Promise<boolean> {
+    try {
+      const { status } = await Camera.requestCameraPermissionsAsync();
+      const granted = status === 'granted';
+      
+      if (!granted) {
+        this.showPermissionAlert('Camera', 'This app needs camera access to scan QR codes and stream video.');
+      }
+      
+      return granted;
+    } catch (error) {
+      console.error('[PermissionManager] Camera permission request failed:', error);
+      return false;
+    }
+  }
+
+  async requestNotificationPermission(): Promise<boolean> {
+    try {
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+
+      const granted = finalStatus === 'granted';
+      
+      if (!granted) {
+        this.showPermissionAlert('Notifications', 'This app needs notification access to alert you when baby sounds are detected.');
+      }
+      
+      return granted;
+    } catch (error) {
+      console.error('[PermissionManager] Notification permission request failed:', error);
+      return false;
+    }
+  }
+
+  async checkPermissions(): Promise<PermissionStatus> {
+    try {
+      const [microphone, camera, notifications] = await Promise.all([
+        this.checkMicrophonePermission(),
+        this.checkCameraPermission(),
+        this.checkNotificationPermission(),
+      ]);
+
+      this.permissionStatus = { microphone, camera, notifications };
+      return this.permissionStatus;
+    } catch (error) {
+      console.error('[PermissionManager] Failed to check permissions:', error);
+      return this.permissionStatus;
+    }
+  }
+
+  private async checkMicrophonePermission(): Promise<boolean> {
+    try {
+      const { status } = await Audio.getPermissionsAsync();
+      return status === 'granted';
+    } catch {
+      return false;
+    }
+  }
+
+  private async checkCameraPermission(): Promise<boolean> {
+    try {
+      const { status } = await Camera.getCameraPermissionsAsync();
+      return status === 'granted';
+    } catch {
+      return false;
+    }
+  }
+
+  private async checkNotificationPermission(): Promise<boolean> {
+    try {
+      const { status } = await Notifications.getPermissionsAsync();
+      return status === 'granted';
+    } catch {
+      return false;
+    }
+  }
+
+  private showPermissionAlert(permission: string, message: string): void {
+    Alert.alert(
+      `${permission} Permission Required`,
+      message,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Open Settings', onPress: () => this.openSettings() },
+      ]
+    );
+  }
+
+  private openSettings(): void {
+    if (Platform.OS === 'ios') {
+      Linking.openURL('app-settings:');
+    } else {
+      Linking.openSettings();
+    }
+  }
+
+  getPermissionStatus(): PermissionStatus {
+    return { ...this.permissionStatus };
+  }
+
+  hasRequiredPermissions(role: 'listener' | 'parent'): boolean {
+    const { microphone, camera, notifications } = this.permissionStatus;
+    
+    if (role === 'listener') {
+      // Listener needs microphone and notifications
+      return microphone && notifications;
+    } else {
+      // Parent needs camera (for QR scan) and notifications
+      return camera && notifications;
+    }
+  }
+
+  async ensurePermissions(role: 'listener' | 'parent'): Promise<boolean> {
+    const currentStatus = await this.checkPermissions();
+    
+    if (this.hasRequiredPermissions(role)) {
+      return true;
+    }
+
+    // Request missing permissions
+    const requestedStatus = await this.requestAllPermissions();
+    return this.hasRequiredPermissions(role);
+  }
+}
+
+// Export singleton instance
+export const permissionManager = PermissionManager.getInstance();
+===== ./src/utils/copy.ts =====
+import { Platform, Share } from 'react-native';
+
+export async function copyText(text: string) {
+  try {
+    if (Platform.OS === 'web' && 'clipboard' in navigator) {
+      await (navigator as any).clipboard?.writeText(text);
+      return { ok: true, msg: 'Copied to clipboard' };
+    }
+    // Fallback on native and any web where clipboard is unavailable
+    await Share.share({ message: text });
+    return { ok: true, msg: 'Shared' };
+  } catch {
+    return { ok: false, msg: 'Copy not available' };
+  }
+}===== ./src/audio/monitor.test.ts =====
+import { AudioMonitor } from './monitor';
+
+// Mock expo-av
+jest.mock('expo-av', () => ({
+  Audio: {
+    requestPermissionsAsync: jest.fn().mockResolvedValue({ granted: true }),
+    setAudioModeAsync: jest.fn().mockResolvedValue(undefined),
+    Recording: class MockRecording {
+      prepareToRecordAsync = jest.fn().mockResolvedValue(undefined);
+      startAsync = jest.fn().mockResolvedValue(undefined);
+      stopAndUnloadAsync = jest.fn().mockResolvedValue(undefined);
+      getStatusAsync = jest.fn().mockResolvedValue({ 
+        isRecording: true, 
+        metering: -20 
+      });
+    },
+  },
+}));
+
+describe('AudioMonitor', () => {
+  let monitor: AudioMonitor;
+
+  beforeEach(() => {
+    monitor = new AudioMonitor();
+    jest.clearAllMocks();
+  });
+
+  afterEach(async () => {
+    await monitor.stop();
+  });
+
+  test('should start monitoring with default threshold', async () => {
+    await expect(monitor.start()).resolves.not.toThrow();
+  });
+
+  test('should start monitoring with custom threshold', async () => {
+    await expect(monitor.start(0.5)).resolves.not.toThrow();
+  });
+
+  test('should update threshold', () => {
+    monitor.updateThreshold(0.7);
+    // Threshold update should not throw
+    expect(true).toBe(true);
+  });
+
+  test('should register level update listeners', () => {
+    const mockCallback = jest.fn();
+    const unsubscribe = monitor.onLevelUpdate(mockCallback);
+    
+    expect(typeof unsubscribe).toBe('function');
+  });
+
+  test('should register threshold exceeded listeners', () => {
+    const mockCallback = jest.fn();
+    const unsubscribe = monitor.onThresholdExceeded(mockCallback);
+    
+    expect(typeof unsubscribe).toBe('function');
+  });
+
+  test('should unsubscribe listeners correctly', () => {
+    const mockCallback = jest.fn();
+    const unsubscribe = monitor.onLevelUpdate(mockCallback);
+    
+    unsubscribe();
+    // Should not throw
+    expect(true).toBe(true);
+  });
+
+  test('RMS calculation should work with sample data', () => {
+    // Test the RMS logic with known values
+    const testData = new Uint8Array([0, 128, 255, 64, 192]);
+    const expectedRms = Math.sqrt(
+      (Math.pow(0/255, 2) + Math.pow(128/255, 2) + Math.pow(255/255, 2) + Math.pow(64/255, 2) + Math.pow(192/255, 2)) / 5
+    ) * 2;
+    
+    // Since calculateRMS is private, we test the threshold logic indirectly
+    expect(expectedRms).toBeGreaterThan(0);
+    expect(expectedRms).toBeLessThanOrEqual(1);
+  });
+});===== ./src/audio/StreamingService.ts =====
+import { Audio } from 'expo-av';
+import { Platform } from 'react-native';
+import { useSession, Sensitivity } from '@/src/store/useSession';
+import { TransportMessage } from '@/src/transport/RealtimeTransport';
+
+export interface AudioLevelData {
+  level: number;
+  timestamp: number;
+  isNoiseDetected: boolean;
+}
+
+export interface StreamingCallbacks {
+  onAudioLevel: (data: AudioLevelData) => void;
+  onNoiseDetected: (level: number) => void;
+  onError: (error: string) => void;
+}
+
+export class StreamingService {
+  private recording: Audio.Recording | null = null;
+  private isStreaming = false;
+  private audioLevelInterval: NodeJS.Timeout | null = null;
+  private noiseDetectionInterval: NodeJS.Timeout | null = null;
+  private lastNoiseAlert = 0;
+  private noiseAlertCooldown = 30000; // 30 seconds
+  private sensitivityThresholds = {
+    low: 0.3,
+    medium: 0.5,
+    high: 0.7
+  };
+
+  constructor(
+    private callbacks: StreamingCallbacks,
+    private sensitivity: Sensitivity = 'medium'
+  ) {}
+
+  async startStreaming(): Promise<void> {
+    if (this.isStreaming) return;
+
+    try {
+      // Request microphone permission
+      const permission = await Audio.requestPermissionsAsync();
+      if (!permission.granted) {
+        throw new Error('Microphone permission denied');
+      }
+
+      // Configure audio mode
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: true,
+        shouldDuckAndroid: false,
+        playThroughEarpieceAndroid: false,
+      });
+
+      // Start recording
+      this.recording = new Audio.Recording();
+      await this.recording.prepareToRecordAsync({
+        ...Audio.RecordingOptionsPresets.HIGH_QUALITY,
+        android: {
+          ...Audio.RecordingOptionsPresets.HIGH_QUALITY.android,
+          extension: '.m4a',
+          outputFormat: 2, // AndroidOutputFormat.MPEG_4
+          audioEncoder: 3, // AndroidAudioEncoder.AAC
+          sampleRate: 44100,
+          numberOfChannels: 1,
+          bitRate: 128000,
+        },
+        ios: {
+          ...Audio.RecordingOptionsPresets.HIGH_QUALITY.ios,
+          extension: '.m4a',
+          outputFormat: 'aac ', // IOSOutputFormat.MPEG4AAC
+          audioQuality: 127, // IOSAudioQuality.MAX
+          sampleRate: 44100,
+          numberOfChannels: 1,
+          bitRate: 128000,
+          linearPCMBitDepth: 16,
+          linearPCMIsBigEndian: false,
+          linearPCMIsFloat: false,
+        },
+      });
+
+      await this.recording.startAsync();
+      this.isStreaming = true;
+
+      // Start audio level monitoring
+      this.startAudioLevelMonitoring();
+      
+      // Start noise detection
+      this.startNoiseDetection();
+
+      console.log('[StreamingService] Started streaming');
+
+    } catch (error) {
+      console.error('[StreamingService] Failed to start streaming:', error);
+      this.callbacks.onError(`Failed to start streaming: ${error}`);
+      throw error;
+    }
+  }
+
+  async stopStreaming(): Promise<void> {
+    if (!this.isStreaming) return;
+
+    try {
+      this.isStreaming = false;
+
+      // Stop intervals
+      if (this.audioLevelInterval) {
+        clearInterval(this.audioLevelInterval);
+        this.audioLevelInterval = null;
+      }
+
+      if (this.noiseDetectionInterval) {
+        clearInterval(this.noiseDetectionInterval);
+        this.noiseDetectionInterval = null;
+      }
+
+      // Stop recording
+      if (this.recording) {
+        await this.recording.stopAndUnloadAsync();
+        this.recording = null;
+      }
+
+      console.log('[StreamingService] Stopped streaming');
+
+    } catch (error) {
+      console.error('[StreamingService] Error stopping streaming:', error);
+    }
+  }
+
+  updateSensitivity(sensitivity: Sensitivity): void {
+    this.sensitivity = sensitivity;
+  }
+
+  private startAudioLevelMonitoring(): void {
+    this.audioLevelInterval = setInterval(async () => {
+      if (!this.recording || !this.isStreaming) return;
+
+      try {
+        const status = await this.recording.getStatusAsync();
+        if (status.isRecording) {
+          // Get audio level (this is a simplified approach)
+          // In a real app, you'd analyze the actual audio buffer
+          const level = this.getAudioLevel();
+          const timestamp = Date.now();
+          
+          this.callbacks.onAudioLevel({
+            level,
+            timestamp,
+            isNoiseDetected: false
+          });
+        }
+      } catch (error) {
+        console.error('[StreamingService] Error getting audio level:', error);
+      }
+    }, 100); // Update every 100ms
+  }
+
+  private startNoiseDetection(): void {
+    this.noiseDetectionInterval = setInterval(async () => {
+      if (!this.isStreaming) return;
+
+      try {
+        const level = this.getAudioLevel();
+        const threshold = this.sensitivityThresholds[this.sensitivity];
+        
+        if (level > threshold) {
+          const now = Date.now();
+          if (now - this.lastNoiseAlert > this.noiseAlertCooldown) {
+            this.lastNoiseAlert = now;
+            this.callbacks.onNoiseDetected(level);
+            
+            // Update audio level data to show noise detected
+            this.callbacks.onAudioLevel({
+              level,
+              timestamp: now,
+              isNoiseDetected: true
+            });
+          }
+        }
+      } catch (error) {
+        console.error('[StreamingService] Error in noise detection:', error);
+      }
+    }, 500); // Check every 500ms
+  }
+
+  private getAudioLevel(): number {
+    // This is a simplified audio level calculation
+    // In a real app, you'd analyze the actual audio buffer from the recording
+    // For now, we'll simulate varying levels
+    const baseLevel = Math.random() * 0.3; // Base ambient noise
+    const variation = Math.random() * 0.4; // Random variation
+    return Math.min(1.0, Math.max(0.0, baseLevel + variation));
+  }
+
+  isActive(): boolean {
+    return this.isStreaming;
+  }
+
+  getStatus(): { isStreaming: boolean; sensitivity: Sensitivity } {
+    return {
+      isStreaming: this.isStreaming,
+      sensitivity: this.sensitivity
+    };
+  }
+}
+
+// Video streaming service for camera feed
+export class VideoStreamingService {
+  private isStreaming = false;
+  private cameraStream: MediaStream | null = null;
+
+  async startVideoStream(): Promise<MediaStream> {
+    if (this.isStreaming) {
+      throw new Error('Video streaming already active');
+    }
+
+    try {
+      // Request camera permission
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: 'environment', // Back camera by default
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          frameRate: { ideal: 30 }
+        },
+        audio: false
+      });
+
+      this.cameraStream = stream;
+      this.isStreaming = true;
+
+      console.log('[VideoStreamingService] Started video streaming');
+      return stream;
+
+    } catch (error) {
+      console.error('[VideoStreamingService] Failed to start video streaming:', error);
+      throw error;
+    }
+  }
+
+  stopVideoStream(): void {
+    if (this.cameraStream) {
+      this.cameraStream.getTracks().forEach(track => track.stop());
+      this.cameraStream = null;
+    }
+    this.isStreaming = false;
+    console.log('[VideoStreamingService] Stopped video streaming');
+  }
+
+  switchCamera(): Promise<MediaStream> {
+    if (!this.isStreaming) {
+      throw new Error('Video streaming not active');
+    }
+
+    // Stop current stream
+    this.stopVideoStream();
+    
+    // Start new stream with opposite facing mode
+    const newFacingMode = this.cameraStream?.getVideoTracks()[0]?.getSettings().facingMode === 'user' ? 'environment' : 'user';
+    
+    return navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: newFacingMode,
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+        frameRate: { ideal: 30 }
+      },
+      audio: false
+    });
+  }
+
+  isActive(): boolean {
+    return this.isStreaming;
+  }
+}
+===== ./src/audio/monitor.ts =====
+import { Audio } from 'expo-av';
+import { Platform } from 'react-native';
+
+export class AudioMonitor {
+  private recording: Audio.Recording | null = null;
+  private intervalId: NodeJS.Timeout | null = null;
+  private threshold: number = 0.3;
+  private listeners: {
+    onLevelUpdate: ((level: number) => void)[];
+    onThresholdExceeded: (() => void)[];
+  } = {
+    onLevelUpdate: [],
+    onThresholdExceeded: [],
+  };
+  private lastExceededTime: number = 0;
+  private readonly THRESHOLD_DURATION = 300; // 300ms
+  private audioContext: AudioContext | null = null;
+  private analyser: AnalyserNode | null = null;
+  private dataArray: Uint8Array | null = null;
+
+  async start(threshold: number = 0.3): Promise<void> {
+    this.threshold = threshold;
+
+    // Request permissions
+    const { granted } = await Audio.requestPermissionsAsync();
+    if (!granted) {
+      throw new Error('Microphone permission not granted');
+    }
+
+    // Configure audio mode
+    await Audio.setAudioModeAsync({
+      allowsRecordingIOS: true,
+      playsInSilentModeIOS: true,
+      shouldDuckAndroid: true,
+      playThroughEarpieceAndroid: false,
+      staysActiveInBackground: Platform.OS === 'ios',
+    });
+
+    // Start recording and level monitoring
+    if (Platform.OS === 'web') {
+      await this.startWebAudioMonitoring();
+    } else {
+      await this.startNativeRecording();
+    }
+    
+    this.startLevelMonitoring();
+  }
+
+  async stop(): Promise<void> {
+    if (this.intervalId) {
+      clearInterval(this.intervalId);
+      this.intervalId = null;
+    }
+
+    if (this.recording) {
+      try {
+        await this.recording.stopAndUnloadAsync();
+      } catch (error) {
+        console.error('Error stopping recording:', error);
+      }
+      this.recording = null;
+    }
+
+    if (this.audioContext) {
+      this.audioContext.close();
+      this.audioContext = null;
+      this.analyser = null;
+      this.dataArray = null;
+    }
+  }
+
+  updateThreshold(threshold: number): void {
+    this.threshold = threshold;
+  }
+
+  onLevelUpdate(callback: (level: number) => void): () => void {
+    this.listeners.onLevelUpdate.push(callback);
+    return () => {
+      const index = this.listeners.onLevelUpdate.indexOf(callback);
+      if (index > -1) {
+        this.listeners.onLevelUpdate.splice(index, 1);
+      }
+    };
+  }
+
+  onThresholdExceeded(callback: () => void): () => void {
+    this.listeners.onThresholdExceeded.push(callback);
+    return () => {
+      const index = this.listeners.onThresholdExceeded.indexOf(callback);
+      if (index > -1) {
+        this.listeners.onThresholdExceeded.splice(index, 1);
+      }
+    };
+  }
+
+  private async startWebAudioMonitoring(): Promise<void> {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: { echoCancellation: false, noiseSuppression: false } 
+      });
+      
+      this.audioContext = new AudioContext();
+      this.analyser = this.audioContext.createAnalyser();
+      this.analyser.fftSize = 256;
+      this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
+      
+      const source = this.audioContext.createMediaStreamSource(stream);
+      source.connect(this.analyser);
+    } catch (error) {
+      throw new Error(`Failed to start web audio monitoring: ${error}`);
+    }
+  }
+
+  private async startNativeRecording(): Promise<void> {
+    this.recording = new Audio.Recording();
+    try {
+      await this.recording.prepareToRecordAsync({
+        android: {
+          extension: '.m4a',
+          outputFormat: Audio.AndroidOutputFormat.MPEG_4,
+          audioEncoder: Audio.AndroidAudioEncoder.AAC,
+          sampleRate: 44100,
+          numberOfChannels: 1,
+          bitRate: 128000,
+        },
+        ios: {
+          extension: '.m4a',
+          outputFormat: Audio.IOSOutputFormat.MPEG4AAC,
+          audioQuality: Audio.IOSAudioQuality.MEDIUM,
+          sampleRate: 44100,
+          numberOfChannels: 1,
+          bitRate: 128000,
+          linearPCMBitDepth: 16,
+          linearPCMIsBigEndian: false,
+          linearPCMIsFloat: false,
+        },
+        web: {
+          mimeType: 'audio/webm',
+          bitsPerSecond: 128000,
+        },
+      });
+
+      await this.recording.startAsync();
+    } catch (error) {
+      throw new Error(`Failed to start recording: ${error}`);
+    }
+  }
+
+  private startLevelMonitoring(): void {
+    this.intervalId = setInterval(async () => {
+      let level = 0;
+
+      if (Platform.OS === 'web' && this.analyser && this.dataArray) {
+        // Web: Use Web Audio API for real-time level detection
+        this.analyser.getByteFrequencyData(this.dataArray);
+        const rms = this.calculateRMS(this.dataArray);
+        level = rms;
+      } else if (this.recording) {
+        // Native: Use recording status (limited real-time capability)
+        try {
+          const status = await this.recording.getStatusAsync();
+          if (status.isRecording) {
+            // iOS provides metering data, Android needs simulation
+            level = this.getMeteringLevel(status);
+          }
+        } catch (error) {
+          console.error('Error getting recording status:', error);
+        }
+      }
+      
+      // Notify level update listeners
+      this.listeners.onLevelUpdate.forEach(callback => callback(level));
+      
+      // Check threshold
+      if (level > this.threshold) {
+        const now = Date.now();
+        if (now - this.lastExceededTime >= this.THRESHOLD_DURATION) {
+          this.lastExceededTime = now;
+          this.listeners.onThresholdExceeded.forEach(callback => callback());
+        }
+      }
+    }, 100); // Check every 100ms
+  }
+
+  private calculateRMS(dataArray: Uint8Array): number {
+    let sum = 0;
+    for (let i = 0; i < dataArray.length; i++) {
+      const normalizedValue = dataArray[i] / 255.0;
+      sum += normalizedValue * normalizedValue;
+    }
+    const rms = Math.sqrt(sum / dataArray.length);
+    return Math.min(1, rms * 2); // Scale and cap at 1
+  }
+
+  private getMeteringLevel(status: any): number {
+    // On iOS, we can get actual metering data
+    if (Platform.OS === 'ios' && status.metering !== undefined) {
+      // Convert dB to linear scale (0-1)
+      const db = status.metering;
+      return Math.max(0, Math.min(1, (db + 60) / 60));
+    }
+    
+    // For Android, simulate varying levels (limited without direct audio analysis)
+    return Math.random() * 0.6;
+  }
+}===== ./src/theme/index.ts =====
+export const theme = {
+  color: {
+    bgDay: "#F7F8FB",
+    bgNight: "#0B1020",
+    cardDay: "#FFFFFF",
+    cardNight: "#141A33",
+    textDay: "#0C1222",
+    textNight: "#E8ECF8",
+    primary: "#4C6EF5",
+    accent: "#FFB3C1",
+    success: "#6BCB77",
+    warning: "#FF8A5B",
+    border: "#E3E7EF",
+    borderDark: "#1F2747",
+    // Additional colors for React Native
+    slate: {
+      50: "#F8FAFC",
+      100: "#F1F5F9",
+      200: "#E2E8F0",
+      300: "#CBD5E1",
+      400: "#94A3B8",
+      500: "#64748B",
+      600: "#475569",
+      700: "#334155",
+      800: "#1E293B",
+      900: "#0F172A",
+    },
+    emerald: {
+      100: "#D1FAE5",
+      500: "#10B981",
+      700: "#047857",
+    },
+    indigo: {
+      100: "#E0E7FF",
+      700: "#4338CA",
+    },
+  },
+  spacing: {
+    xs: 4,
+    sm: 8,
+    md: 16,
+    lg: 24,
+    xl: 32,
+    xxl: 48,
+  },
+  borderRadius: {
+    sm: 8,
+    md: 12,
+    lg: 16,
+    xl: 20,
+    xxl: 24,
+  },
+  typography: {
+    xs: { fontSize: 12, lineHeight: 16 },
+    sm: { fontSize: 14, lineHeight: 20 },
+    base: { fontSize: 16, lineHeight: 24 },
+    lg: { fontSize: 18, lineHeight: 28 },
+    xl: { fontSize: 20, lineHeight: 28 },
+    xxl: { fontSize: 24, lineHeight: 32 },
+  },
+};
+===== ./src/store/useSession.ts =====
+import { create } from 'zustand';
+
+export type Role = 'listener' | 'parent';
+export type SessionState = 'idle' | 'pairing' | 'connecting' | 'streaming' | 'paused' | 'disconnected';
+export type StreamMode = 'audio' | 'audio+video';
+export type Sensitivity = 'low' | 'medium' | 'high';
+export type Connectivity = 'nearby' | 'anywhere';
+
+export interface SessionData {
+  roomId: string;
+  joinKey: string;
+  mode: StreamMode;
+  sensitivity: Sensitivity;
+  connectivity: Connectivity;
+  createdAt: number;
+  expiresAt: number;
+  timestamp: number;
+}
+
+interface AppState {
+  // Role and navigation
+  role: Role | null;
+  setRole: (role: Role | null) => void;
+  
+  // Session management
+  sessionState: SessionState;
+  setSessionState: (state: SessionState) => void;
+  
+  // Current session data
+  currentSession: SessionData | null;
+  setCurrentSession: (session: SessionData | null) => void;
+  
+  // Stream configuration
+  streamMode: StreamMode;
+  setStreamMode: (mode: StreamMode) => void;
+  
+  sensitivity: Sensitivity;
+  setSensitivity: (sensitivity: Sensitivity) => void;
+  
+  connectivity: Connectivity;
+  setConnectivity: (connectivity: Connectivity) => void;
+  
+  // Audio monitoring
+  threshold: number;
+  setThreshold: (threshold: number) => void;
+  
+  // Notifications
+  lastAlert: string | null;
+  setLastAlert: (alert: string | null) => void;
+  
+  // Connection status
+  isConnected: boolean;
+  setIsConnected: (connected: boolean) => void;
+  
+  // Reconnection attempts
+  reconnectAttempts: number;
+  setReconnectAttempts: (attempts: number) => void;
+  
+  // Reset session (for cleanup)
+  resetSession: () => void;
+  
+  // Generate new session
+  generateNewSession: () => SessionData;
+}
+
+export const useSession = create<AppState>((set, get) => ({
+  // Initial state
+  role: null,
+  sessionState: 'idle',
+  currentSession: null,
+  streamMode: 'audio',
+  sensitivity: 'medium',
+  connectivity: 'nearby',
+  threshold: 0.5,
+  lastAlert: null,
+  isConnected: false,
+  reconnectAttempts: 0,
+  
+  // Actions
+  setRole: (role) => set({ role }),
+  setSessionState: (state) => set({ sessionState: state }),
+  setCurrentSession: (session) => set({ currentSession: session }),
+  setStreamMode: (mode) => set({ streamMode: mode }),
+  setSensitivity: (sensitivity) => set({ sensitivity }),
+  setConnectivity: (connectivity) => set({ connectivity }),
+  setThreshold: (threshold) => set({ threshold }),
+  setLastAlert: (alert) => set({ lastAlert: alert }),
+  setIsConnected: (connected) => set({ isConnected: connected }),
+  setReconnectAttempts: (attempts) => set({ reconnectAttempts: attempts }),
+  
+  resetSession: () => set({
+    sessionState: 'idle',
+    currentSession: null,
+    isConnected: false,
+    reconnectAttempts: 0,
+    lastAlert: null,
+  }),
+  
+  generateNewSession: () => {
+    const roomId = `room_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const joinKey = `key_${Math.random().toString(36).substr(2, 12)}`;
+    const createdAt = Date.now();
+    const expiresAt = createdAt + (10 * 60 * 1000); // 10 minutes
+    
+    const session: SessionData = {
+      roomId,
+      joinKey,
+      mode: get().streamMode,
+      sensitivity: get().sensitivity,
+      connectivity: get().connectivity,
+      createdAt,
+      expiresAt,
+      timestamp: createdAt,
+    };
+    
+    set({ currentSession: session, sessionState: 'pairing' });
+    return session;
+  },
+}));

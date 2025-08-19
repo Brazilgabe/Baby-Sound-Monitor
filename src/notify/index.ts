@@ -1,4 +1,5 @@
 import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
 
 export async function registerForPushNotifications(): Promise<string | null> {
   try {
@@ -15,7 +16,7 @@ export async function registerForPushNotifications(): Promise<string | null> {
     }
 
     const token = await Notifications.getExpoPushTokenAsync({
-      projectId: 'your-expo-project-id', // Replace with your actual project ID
+      projectId: Constants.expoConfig?.extra?.projectId,
     });
     
     return token.data;

@@ -24,6 +24,7 @@ export default (): ExpoConfig => {
         NSCameraUsageDescription: "This app uses the camera to scan QR codes and stream video from the nursery.",
         UIBackgroundModes: ["audio", "background-processing"],
         NSUserNotificationsUsageDescription: "This app needs to send notifications when baby sounds are detected.",
+        ITSAppUsesNonExemptEncryption: false,
       },
     },
     android: {
@@ -37,16 +38,28 @@ export default (): ExpoConfig => {
         "INTERNET"
       ],
     },
+    extra: {
+      eas: { projectId: "5a4b6172-4622-45a2-8327-635cba91b806" },
+      projectId: "5a4b6172-4622-45a2-8327-635cba91b806",
+    },
+
     web: {
       bundler: "metro",
       output: "static",
       favicon: "./assets/images/favicon.png",
+      // Web-specific configuration
+      build: {
+        babel: {
+          include: ["@expo/vector-icons", "lucide-react-native"]
+        }
+      }
     },
     plugins: [
-      ...(!isWeb ? [["expo-notifications"]] : []),
+      // Only include native plugins for mobile platforms
+      ...(!isWeb ? ["expo-notifications"] : []),
       ...(useDevClient && !isWeb ? ["expo-dev-client"] : []),
-      "expo-camera",
-      "expo-av",
-    ] as any[], // Fix for linter error
+      ...(!isWeb ? ["expo-camera"] : []),
+      ...(!isWeb ? ["expo-av"] : []),
+    ] as any[],
   };
 };

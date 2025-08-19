@@ -5,13 +5,17 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  Alert,
+  Platform,
+  Linking,
   Image,
   Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Baby, Headphones, Shield, Bell, Camera, Mic } from 'lucide-react-native';
-import { useSession } from '@/src/store/useSession';
+import { Baby, Headphones, Shield, Bell, Mic, Camera, CheckCircle } from 'lucide-react-native';
+import { theme } from '@/src/theme';
 import { permissionManager } from '@/src/utils/PermissionManager';
+import { useSession } from '@/src/store/useSession';
 
 const { width } = Dimensions.get('window');
 

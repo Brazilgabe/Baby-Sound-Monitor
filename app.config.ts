@@ -25,12 +25,16 @@ export default (): ExpoConfig => {
         UIBackgroundModes: ["audio", "background-processing"],
         NSUserNotificationsUsageDescription: "This app needs to send notifications when baby sounds are detected.",
         ITSAppUsesNonExemptEncryption: false,
+        NSBluetoothAlwaysUsageDescription: "Used to discover and connect to a nearby parent device.",
+        NSLocalNetworkUsageDescription: "Used for peer discovery and connection over local network.",
+        NSBonjourServices: ["_mpc._tcp", "_companion-link._tcp"],
       },
     },
     android: {
       package: "com.babysoundmonitor.app",
       permissions: [
         "RECORD_AUDIO",
+        "MODIFY_AUDIO_SETTINGS",
         "WAKE_LOCK",
         "CAMERA",
         "POST_NOTIFICATIONS",

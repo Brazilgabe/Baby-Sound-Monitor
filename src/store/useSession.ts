@@ -4,14 +4,14 @@ export type Role = 'listener' | 'parent';
 export type SessionState = 'idle' | 'pairing' | 'connecting' | 'streaming' | 'paused' | 'disconnected';
 export type StreamMode = 'audio' | 'audio+video';
 export type Sensitivity = 'low' | 'medium' | 'high';
-export type Connectivity = 'nearby' | 'anywhere';
+export type ConnectionType = 'wifi' | 'bt';
 
 export interface SessionData {
   roomId: string;
   joinKey: string;
   mode: StreamMode;
   sensitivity: Sensitivity;
-  connectivity: Connectivity;
+  connectionType: ConnectionType;
   createdAt: number;
   expiresAt: number;
   timestamp: number;
@@ -37,8 +37,8 @@ interface AppState {
   sensitivity: Sensitivity;
   setSensitivity: (sensitivity: Sensitivity) => void;
   
-  connectivity: Connectivity;
-  setConnectivity: (connectivity: Connectivity) => void;
+  connectionType: ConnectionType;
+  setConnectionType: (type: ConnectionType) => void;
   
   // Audio monitoring
   threshold: number;
@@ -51,6 +51,10 @@ interface AppState {
   // Connection status
   isConnected: boolean;
   setIsConnected: (connected: boolean) => void;
+  
+  // Connection details
+  connectionStatus: 'disconnected' | 'connecting' | 'connected' | 'failed';
+  setConnectionStatus: (status: 'disconnected' | 'connecting' | 'connected' | 'failed') => void;
   
   // Reconnection attempts
   reconnectAttempts: number;
@@ -70,10 +74,11 @@ export const useSession = create<AppState>((set, get) => ({
   currentSession: null,
   streamMode: 'audio',
   sensitivity: 'medium',
-  connectivity: 'nearby',
+  connectionType: 'wifi',
   threshold: 0.5,
   lastAlert: null,
   isConnected: false,
+  connectionStatus: 'disconnected',
   reconnectAttempts: 0,
   
   // Actions
@@ -82,16 +87,18 @@ export const useSession = create<AppState>((set, get) => ({
   setCurrentSession: (session) => set({ currentSession: session }),
   setStreamMode: (mode) => set({ streamMode: mode }),
   setSensitivity: (sensitivity) => set({ sensitivity }),
-  setConnectivity: (connectivity) => set({ connectivity }),
+  setConnectionType: (type) => set({ connectionType: type }),
   setThreshold: (threshold) => set({ threshold }),
   setLastAlert: (alert) => set({ lastAlert: alert }),
   setIsConnected: (connected) => set({ isConnected: connected }),
+  setConnectionStatus: (status) => set({ connectionStatus: status }),
   setReconnectAttempts: (attempts) => set({ reconnectAttempts: attempts }),
   
   resetSession: () => set({
     sessionState: 'idle',
     currentSession: null,
     isConnected: false,
+    connectionStatus: 'disconnected',
     reconnectAttempts: 0,
     lastAlert: null,
   }),
@@ -107,7 +114,7 @@ export const useSession = create<AppState>((set, get) => ({
       joinKey,
       mode: get().streamMode,
       sensitivity: get().sensitivity,
-      connectivity: get().connectivity,
+      connectionType: get().connectionType,
       createdAt,
       expiresAt,
       timestamp: createdAt,

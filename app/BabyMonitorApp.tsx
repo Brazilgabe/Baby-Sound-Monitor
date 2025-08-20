@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Platform } from 'react-native';
 import ConnectionSelect from './screens/ConnectionSelect';
 import RoleSelect from './screens/RoleSelect';
@@ -7,14 +7,56 @@ import QRScanner from './screens/QRScanner';
 import CodeEntry from './screens/CodeEntry';
 import ParentMonitor from './screens/ParentMonitor';
 import NurseryListener from './screens/NurseryListener';
+import { useSession, ConnectionType, StreamMode } from '@/src/store/useSession';
+import { getConnectionManager, clearConnectionManager } from '@/src/transport/ConnectionManager';
 
 type AppStep = "connect" | "role" | "pair" | "qr" | "code" | "parent" | "baby";
 
 export default function BabyMonitorApp() {
   const [step, setStep] = useState<AppStep>("connect");
-  const [conn, setConn] = useState<"wifi" | "bt" | null>(null);
+  const [conn, setConn] = useState<ConnectionType | null>(null);
   const [role, setRole] = useState<"parent" | "baby" | null>(null);
-  const [mode, setMode] = useState<"audio" | "video">("audio");
+  const [mode, setMode] = useState<StreamMode>("audio");
+  
+  const { 
+    connectionType, 
+    setConnectionType, 
+    setConnectionStatus,
+    setIsConnected,
+    generateNewSession,
+    currentSession,
+    setCurrentSession
+  } = useSession();
+
+  // Initialize connection manager
+  useEffect(() => {
+    const connectionManager = getConnectionManager({
+      onConnected: () => {
+        console.log('[BabyMonitorApp] Connected successfully');
+        setIsConnected(true);
+        setConnectionStatus('connected');
+      },
+      onDisconnected: () => {
+        console.log('[BabyMonitorApp] Disconnected');
+        setIsConnected(false);
+        setConnectionStatus('disconnected');
+      },
+      onError: (error: string) => {
+        console.error('[BabyMonitorApp] Connection error:', error);
+        setConnectionStatus('failed');
+        // In a real app, you'd show an error message to the user
+      },
+      onMessage: (message) => {
+        console.log('[BabyMonitorApp] Received message:', message);
+        // Handle incoming messages based on role and message type
+      },
+    });
+
+    // Cleanup on unmount
+    return () => {
+      clearConnectionManager();
+    };
+  }, []);
 
   // Web compatibility check
   if (Platform.OS === 'web') {
@@ -50,9 +92,46 @@ export default function BabyMonitorApp() {
     );
   }
 
-  const handleConnectionSelect = (choice: "wifi" | "bt") => {
-    setConn(choice);
-    setStep("role");
+  const handleConnectionSelect = async (choice: ConnectionType) => {
+    try {
+      setConn(choice);
+      setConnectionType(choice);
+      
+      // Generate a new session for the selected connection type
+      const session = generateNewSession();
+      setCurrentSession(session);
+      
+      // Attempt to establish connection
+      const connectionManager = getConnectionManager({
+        onConnected: () => {
+          console.log('[BabyMonitorApp] Connected successfully');
+          setIsConnected(true);
+          setConnectionStatus('connected');
+          setStep("role");
+        },
+        onDisconnected: () => {
+          console.log('[BabyMonitorApp] Disconnected');
+          setIsConnected(false);
+          setConnectionStatus('disconnected');
+        },
+        onError: (error: string) => {
+          console.error('[BabyMonitorApp] Connection error:', error);
+          setConnectionStatus('failed');
+          // Show error and allow retry
+          alert(`Connection failed: ${error}. Please try again.`);
+        },
+        onMessage: (message) => {
+          console.log('[BabyMonitorApp] Received message:', message);
+        },
+      });
+
+      await connectionManager.connect(choice, session);
+      
+    } catch (error) {
+      console.error('[BabyMonitorApp] Failed to establish connection:', error);
+      setConnectionStatus('failed');
+      alert(`Failed to establish connection: ${error}. Please try again.`);
+    }
   };
 
   const handleRoleSelect = (selectedRole: "parent" | "baby") => {
@@ -72,10 +151,25 @@ export default function BabyMonitorApp() {
     setStep("role");
   };
 
-  const handleBackToConnection = () => {
+  const handleBackToConnection = async () => {
+    // Disconnect current connection
+    try {
+      const connectionManager = getConnectionManager({
+        onConnected: () => {},
+        onDisconnected: () => {},
+        onError: () => {},
+        onMessage: () => {},
+      });
+      await connectionManager.disconnect();
+    } catch (error) {
+      console.error('[BabyMonitorApp] Error disconnecting:', error);
+    }
+    
     setStep("connect");
     setConn(null);
     setRole(null);
+    setConnectionStatus('disconnected');
+    setIsConnected(false);
   };
 
   const handleBackToPairing = () => {
@@ -123,7 +217,7 @@ export default function BabyMonitorApp() {
         />
       )}
       
-      {step === "parent" && (
+      {step === "parent" && conn && (
         <ParentMonitor
           onBack={handleBackToRole}
           conn={conn}
@@ -131,7 +225,7 @@ export default function BabyMonitorApp() {
         />
       )}
       
-      {step === "baby" && (
+      {step === "baby" && conn && (
         <NurseryListener
           onBackToRole={handleBackToRole}
           conn={conn}

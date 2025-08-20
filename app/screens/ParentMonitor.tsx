@@ -1,145 +1,181 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Play, Square, Bell, Home, Activity, Settings } from 'lucide-react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { theme } from '@/src/theme';
-import { Header } from '@/components/ui/Header';
-import { ConnectionPill } from '@/components/ui/ConnectionPill';
-import { ModeBadge } from '@/components/ui/ModeBadge';
-import { WaveformPreview } from '@/components/ui/WaveformPreview';
-import { LabeledSlider } from '@/components/ui/LabeledSlider';
+import { Ionicons } from '@expo/vector-icons';
+import { useSession, ConnectionType, StreamMode } from '@/src/store/useSession';
 
 interface ParentMonitorProps {
-  onBack?: () => void;
-  conn: "wifi" | "bt" | null;
-  mode: "audio" | "video";
+  onBack: () => void;
+  conn: ConnectionType;
+  mode: StreamMode;
 }
 
 export default function ParentMonitor({ onBack, conn, mode }: ParentMonitorProps) {
   const [isListening, setIsListening] = useState(false);
-  const [preset, setPreset] = useState("Normal home");
-  const [threshold, setThreshold] = useState(45);
-  
-  const tabs = [
-    { key: "monitor", label: "Monitor", icon: Home },
-    { key: "timeline", label: "Timeline", icon: Activity },
-    { key: "settings", label: "Settings", icon: Settings },
-  ];
-  const [tab, setTab] = useState<typeof tabs[number]["key"]>("monitor");
+  const [noiseLevel, setNoiseLevel] = useState(0);
+  const [lastNoise, setLastNoise] = useState<Date | null>(null);
+  const { currentSession, connectionStatus, isConnected } = useSession();
+
+  useEffect(() => {
+    // Simulate noise detection
+    if (isListening) {
+      const interval = setInterval(() => {
+        const level = Math.random() * 100;
+        setNoiseLevel(level);
+        
+        if (level > 70) {
+          setLastNoise(new Date());
+          // In a real app, you'd send a notification here
+        }
+      }, 1000);
+
+      return () => clearInterval(interval);
+    }
+  }, [isListening]);
+
+  const handleStartListening = () => {
+    setIsListening(true);
+  };
+
+  const handleStopListening = () => {
+    setIsListening(false);
+    setNoiseLevel(0);
+  };
+
+  const handleBack = () => {
+    if (isListening) {
+      Alert.alert(
+        'Stop Listening',
+        'Are you sure you want to stop listening?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Stop', style: 'destructive', onPress: onBack }
+        ]
+      );
+    } else {
+      onBack();
+    }
+  };
+
+  const getConnectionTypeText = () => {
+    return conn === 'wifi' ? 'Wi-Fi or Data' : 'Bluetooth';
+  };
+
+  const getConnectionTypeIcon = () => {
+    return conn === 'wifi' ? 'wifi' : 'bluetooth';
+  };
+
+  const getConnectionTypeColor = () => {
+    return conn === 'wifi' ? '#4C6EF5' : '#8B5CF6';
+  };
+
+  const getModeText = () => {
+    return mode === 'audio' ? 'Audio Only' : 'Audio + Video';
+  };
+
+  const getModeIcon = () => {
+    return mode === 'audio' ? 'mic' : 'videocam';
+  };
 
   return (
     <SafeAreaView style={styles.container}>
-      <Header onBack={onBack} onSettings={() => setTab("settings")} />
-
-      <View style={styles.connectionInfo}>
-        <ConnectionPill conn={conn} />
-        <ModeBadge mode={mode} />
+      <View style={styles.header}>
+        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color="#374151" />
+        </TouchableOpacity>
+        
+        <View style={styles.headerContent}>
+          <View style={styles.connectionInfo}>
+            <View style={[styles.connectionIcon, { backgroundColor: getConnectionTypeColor() + '20' }]}>
+              <Ionicons name={getConnectionTypeIcon()} size={24} color={getConnectionTypeColor()} />
+            </View>
+            <Text style={styles.connectionText}>{getConnectionTypeText()}</Text>
+          </View>
+          
+          <Text style={styles.title}>Parent Monitor</Text>
+          <Text style={styles.subtitle}>
+            Listening for sounds from the nursery
+          </Text>
+        </View>
       </View>
 
       <View style={styles.content}>
-        {tab === "monitor" && (
-          <View style={styles.monitorTab}>
-            <View style={styles.monitorCard}>
-              <View style={styles.statusRow}>
-                <View style={styles.statusInfo}>
-                  <View style={[styles.statusDot, isListening && styles.statusDotActive]} />
-                  <Text style={styles.statusText}>
-                    {isListening ? "Listening" : "Paused"}
-                  </Text>
-                </View>
-                <Text style={styles.presetText}>Preset: {preset}</Text>
-              </View>
-              
-              <View style={styles.waveformContainer}>
-                <WaveformPreview level={isListening ? 0.6 : 0.3} />
-              </View>
-              
-              <View style={styles.controlsRow}>
-                <View style={styles.presetButtons}>
-                  {["Quiet apartment", "Normal home", "Noisy environment"].map((p) => (
-                    <TouchableOpacity
-                      key={p}
-                      style={[styles.presetButton, preset === p && styles.presetButtonSelected]}
-                      onPress={() => setPreset(p)}
-                    >
-                      <Text style={[styles.presetButtonText, preset === p && styles.presetButtonTextSelected]}>
-                        {p}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-                
-                <TouchableOpacity
-                  style={[styles.playButton, { backgroundColor: theme.color.primary }]}
-                  onPress={() => setIsListening(!isListening)}
-                >
-                  {isListening ? <Square size={16} color="#FFFFFF" /> : <Play size={16} color="#FFFFFF" />}
-                  <Text style={styles.playButtonText}>
-                    {isListening ? "Stop" : "Start"}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-              
-              <LabeledSlider label="Noise threshold" value={threshold} onChange={setThreshold} />
-              
-              <View style={styles.bedtimeInfo}>
-                <Bell size={16} color={theme.color.slate[600]} />
-                <Text style={styles.bedtimeText}>Bedtime Focus reduces minor noise alerts</Text>
-              </View>
+        {/* Mode and Connection Info */}
+        <View style={styles.infoContainer}>
+          <View style={styles.infoRow}>
+            <View style={styles.infoItem}>
+              <Ionicons name={getModeIcon()} size={20} color="#4C6EF5" />
+              <Text style={styles.infoLabel}>Mode</Text>
+              <Text style={styles.infoValue}>{getModeText()}</Text>
             </View>
             
-            <Text style={styles.quietMessage}>All quiet. We will let you know if anything changes.</Text>
+            <View style={styles.infoItem}>
+              <Ionicons name="wifi" size={20} color="#10B981" />
+              <Text style={styles.infoLabel}>Status</Text>
+              <Text style={styles.infoValue}>
+                {isConnected ? 'Connected' : 'Disconnected'}
+              </Text>
+            </View>
           </View>
-        )}
-        
-        {tab === "timeline" && (
-          <View style={styles.timelineTab}>
-            {[1, 2, 3].map((i) => (
-              <View key={i} style={styles.timelineItem}>
-                <View style={styles.timelineContent}>
-                  <Text style={styles.timelineTitle}>Cry detected</Text>
-                  <Text style={styles.timelineSubtitle}>Duration 18s · 2:11 am</Text>
-                </View>
-                <TouchableOpacity style={styles.timelineButton}>
-                  <Text style={styles.timelineButtonText}>Details</Text>
-                </TouchableOpacity>
-              </View>
-            ))}
+        </View>
+
+        {/* Noise Level Display */}
+        <View style={styles.noiseContainer}>
+          <Text style={styles.noiseTitle}>Current Noise Level</Text>
+          
+          <View style={styles.noiseMeter}>
+            <View style={styles.noiseBar}>
+              <View 
+                style={[
+                  styles.noiseLevel, 
+                  { 
+                    width: `${noiseLevel}%`,
+                    backgroundColor: noiseLevel > 70 ? '#EF4444' : noiseLevel > 40 ? '#F59E0B' : '#10B981'
+                  }
+                ]} 
+              />
+            </View>
+            <Text style={styles.noiseValue}>{Math.round(noiseLevel)}%</Text>
           </View>
-        )}
-        
-        {tab === "settings" && (
-          <View style={styles.settingsTab}>
-            <View style={styles.settingItem}>
-              <View style={styles.settingContent}>
-                <Text style={styles.settingTitle}>Notifications</Text>
-                <Text style={styles.settingSubtitle}>Get alerts when crying is detected</Text>
-              </View>
-              <View style={styles.toggle}>
-                <View style={styles.toggleThumb} />
-              </View>
+          
+          <Text style={styles.noiseDescription}>
+            {noiseLevel > 70 ? 'High noise detected!' : 
+             noiseLevel > 40 ? 'Moderate activity' : 'Quiet'}
+          </Text>
+        </View>
+
+        {/* Last Noise Alert */}
+        {lastNoise && (
+          <View style={styles.alertContainer}>
+            <Ionicons name="notifications" size={24} color="#EF4444" />
+            <View style={styles.alertContent}>
+              <Text style={styles.alertTitle}>Noise Alert</Text>
+              <Text style={styles.alertTime}>
+                Last detected: {lastNoise.toLocaleTimeString()}
+              </Text>
             </View>
           </View>
         )}
-      </View>
 
-      {/* Bottom Navigation */}
-      <View style={styles.bottomNav}>
-        <View style={styles.navContent}>
-          {tabs.map(({ key, label, icon: Icon }) => (
-            <TouchableOpacity
-              key={key}
-              style={styles.navButton}
-              onPress={() => setTab(key)}
+        {/* Control Buttons */}
+        <View style={styles.controls}>
+          {!isListening ? (
+            <TouchableOpacity 
+              style={[styles.controlButton, styles.startButton]} 
+              onPress={handleStartListening}
             >
-              <View style={[styles.navIcon, tab === key && styles.navIconActive]}>
-                <Icon size={18} color={tab === key ? theme.color.primary : theme.color.slate[500]} />
-              </View>
-              <Text style={[styles.navLabel, tab === key && styles.navLabelActive]}>
-                {label}
-              </Text>
+              <Ionicons name="play" size={24} color="white" />
+              <Text style={styles.startButtonText}>Start Listening</Text>
             </TouchableOpacity>
-          ))}
+          ) : (
+            <TouchableOpacity 
+              style={[styles.controlButton, styles.stopButton]} 
+              onPress={handleStopListening}
+            >
+              <Ionicons name="stop" size={24} color="white" />
+              <Text style={styles.stopButtonText}>Stop Listening</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     </SafeAreaView>
@@ -149,235 +185,193 @@ export default function ParentMonitor({ onBack, conn, mode }: ParentMonitorProps
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.color.bgDay,
+    backgroundColor: '#F7F8FB',
+  },
+  header: {
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 24,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'white',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  headerContent: {
+    alignItems: 'center',
   },
   connectionInfo: {
-    paddingHorizontal: theme.spacing.md,
-    marginTop: theme.spacing.sm,
     flexDirection: 'row',
-    gap: theme.spacing.sm,
+    alignItems: 'center',
+    backgroundColor: 'white',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginBottom: 16,
+  },
+  connectionIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+  connectionText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#0C1222',
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 22,
   },
   content: {
     flex: 1,
-    paddingHorizontal: theme.spacing.md,
-    paddingBottom: 112, // Space for bottom nav
+    paddingHorizontal: 24,
   },
-  monitorTab: {
-    marginTop: theme.spacing.sm,
-  },
-  monitorCard: {
-    borderRadius: theme.borderRadius.xl,
-    padding: theme.spacing.md,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+  infoContainer: {
+    backgroundColor: 'white',
+    padding: 20,
+    borderRadius: 16,
+    marginBottom: 24,
     borderWidth: 1,
-    borderColor: theme.color.slate[200],
-    backgroundColor: '#FFFFFF',
+    borderColor: '#E2E8F0',
   },
-  statusRow: {
+  infoRow: {
     flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  infoItem: {
     alignItems: 'center',
-    justifyContent: 'space-between',
   },
-  statusInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.sm,
-  },
-  statusDot: {
-    height: 8,
-    width: 8,
-    borderRadius: 4,
-    backgroundColor: theme.color.slate[400],
-  },
-  statusDotActive: {
-    backgroundColor: theme.color.emerald[500],
-  },
-  statusText: {
-    fontSize: theme.typography.sm.fontSize,
-    opacity: 0.8,
-  },
-  presetText: {
+  infoLabel: {
     fontSize: 12,
-    opacity: 0.7,
+    color: '#64748B',
+    marginTop: 8,
+    marginBottom: 4,
   },
-  waveformContainer: {
-    marginTop: theme.spacing.md,
+  infoValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#0C1222',
   },
-  controlsRow: {
-    marginTop: theme.spacing.md,
-    flexDirection: 'row',
+  noiseContainer: {
+    backgroundColor: 'white',
+    padding: 24,
+    borderRadius: 16,
+    marginBottom: 24,
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: theme.spacing.sm,
-  },
-  presetButtons: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: theme.spacing.sm,
-  },
-  presetButton: {
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: 6,
-    borderRadius: 20,
     borderWidth: 1,
-    borderColor: theme.color.slate[200],
-    backgroundColor: '#FFFFFF',
+    borderColor: '#E2E8F0',
   },
-  presetButtonSelected: {
-    backgroundColor: theme.color.primary,
-    borderColor: 'transparent',
+  noiseTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#0C1222',
+    marginBottom: 20,
   },
-  presetButtonText: {
-    fontSize: theme.typography.sm.fontSize,
-    color: theme.color.slate[700],
+  noiseMeter: {
+    width: '100%',
+    marginBottom: 16,
   },
-  presetButtonTextSelected: {
-    color: '#FFFFFF',
+  noiseBar: {
+    width: '100%',
+    height: 20,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 10,
+    overflow: 'hidden',
+    marginBottom: 8,
   },
-  playButton: {
+  noiseLevel: {
+    height: '100%',
+    borderRadius: 10,
+  },
+  noiseValue: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#0C1222',
+    textAlign: 'center',
+  },
+  noiseDescription: {
+    fontSize: 14,
+    color: '#64748B',
+    textAlign: 'center',
+  },
+  alertContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: theme.spacing.sm,
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
-    borderRadius: theme.borderRadius.xl,
-  },
-  playButtonText: {
-    color: '#FFFFFF',
-    fontSize: theme.typography.sm.fontSize,
-    fontWeight: '500',
-  },
-  bedtimeInfo: {
-    marginTop: theme.spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.sm,
-  },
-  bedtimeText: {
-    fontSize: theme.typography.sm.fontSize,
-    opacity: 0.8,
-  },
-  quietMessage: {
-    marginTop: theme.spacing.md,
-    fontSize: theme.typography.sm.fontSize,
-    opacity: 0.8,
-  },
-  timelineTab: {
-    marginTop: theme.spacing.sm,
-    gap: theme.spacing.md,
-  },
-  timelineItem: {
-    borderRadius: theme.borderRadius.xl,
-    padding: theme.spacing.md,
-    borderWidth: 1,
-    borderColor: theme.color.slate[200],
-    backgroundColor: '#FFFFFF',
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-  },
-  timelineContent: {
-    flex: 1,
-  },
-  timelineTitle: {
-    fontSize: theme.typography.sm.fontSize,
-    fontWeight: '500',
-  },
-  timelineSubtitle: {
-    fontSize: 12,
-    opacity: 0.7,
-    marginTop: 2,
-  },
-  timelineButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  timelineButtonText: {
-    fontSize: theme.typography.sm.fontSize,
-    color: theme.color.slate[700],
-  },
-  settingsTab: {
-    marginTop: theme.spacing.sm,
-    gap: theme.spacing.md,
-  },
-  settingItem: {
-    borderRadius: theme.borderRadius.xl,
-    padding: theme.spacing.md,
-    borderWidth: 1,
-    borderColor: theme.color.slate[200],
-    backgroundColor: '#FFFFFF',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  settingContent: {
-    flex: 1,
-  },
-  settingTitle: {
-    fontSize: theme.typography.sm.fontSize,
-    fontWeight: '500',
-  },
-  settingSubtitle: {
-    fontSize: 12,
-    opacity: 0.7,
-    marginTop: 2,
-  },
-  toggle: {
-    width: 48,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: theme.color.primary,
-    padding: 2,
-  },
-  toggleThumb: {
-    width: 24,
-    height: 24,
+    backgroundColor: '#FEF2F2',
+    padding: 16,
     borderRadius: 12,
-    backgroundColor: '#FFFFFF',
-    transform: [{ translateX: 20 }],
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#FECACA',
   },
-  bottomNav: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderTopWidth: 1,
-    borderTopColor: theme.color.border,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-  },
-  navContent: {
-    marginHorizontal: 'auto',
-    maxWidth: 400,
-    paddingHorizontal: theme.spacing.xl,
-    paddingVertical: theme.spacing.sm,
-    flexDirection: 'row',
-    gap: theme.spacing.md,
-  },
-  navButton: {
+  alertContent: {
+    marginLeft: 12,
     flex: 1,
+  },
+  alertTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#DC2626',
+    marginBottom: 4,
+  },
+  alertTime: {
+    fontSize: 14,
+    color: '#DC2626',
+  },
+  controls: {
+    marginTop: 'auto',
+    paddingBottom: 32,
+  },
+  controlButton: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: theme.borderRadius.lg,
-    paddingVertical: theme.spacing.sm,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  navIcon: {
-    padding: theme.spacing.sm,
-    borderRadius: theme.borderRadius.lg,
+  startButton: {
+    backgroundColor: '#10B981',
   },
-  navIconActive: {
-    backgroundColor: `${theme.color.primary}1A`, // 10% opacity
+  startButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
   },
-  navLabel: {
-    fontSize: 12,
-    marginTop: theme.spacing.xs,
-    color: theme.color.slate[500],
+  stopButton: {
+    backgroundColor: '#EF4444',
   },
-  navLabelActive: {
-    color: theme.color.primary,
+  stopButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
   },
 });
